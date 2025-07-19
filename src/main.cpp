@@ -9,6 +9,8 @@
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
+
+
 float cubeVertices[] = {
     // positions
     -0.5f, -0.5f, -0.5f, 0.5f,  -0.5f, -0.5f, 0.5f,  0.5f,  -0.5f,
@@ -43,14 +45,22 @@ int main()
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Voxel Cube", NULL, NULL);
+    if (!window) {
+        std::cerr << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
-    gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+        std::cerr << "Failed to initialize GLAD" << std::endl;
+        return -1;
+    }
 
     glEnable(GL_DEPTH_TEST);
 
-    Shader shader("vertex.glsl", "fragment.glsl");
+    Shader shader("shaders/vertex.glsl", "shaders/fragment.glsl");
 
     unsigned int VAO, VBO;
     glGenVertexArrays(1, &VAO);
@@ -63,6 +73,8 @@ int main()
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
+    float rotationX = 0.0f;
+
     while (!glfwWindowShouldClose(window))
     {
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -70,8 +82,13 @@ int main()
 
         shader.use();
 
-        glm::mat4 model =
-            glm::rotate(glm::mat4(1.0f), (float)glfwGetTime() * 0.5f, glm::vec3(0.0f, 1.0f, 0.0f));
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+            rotationX += 0.02f; // Adjust speed as needed
+        }
+
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::rotate(model, rotationX, glm::vec3(1.0f, 0.0f, 0.0f)); // X axis
+        model = glm::rotate(model, (float)glfwGetTime() * 0.5f, glm::vec3(0.0f, 1.0f, 0.0f)); // Y axis
         glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -3.0f));
         glm::mat4 projection =
             glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / SCR_HEIGHT, 0.1f, 100.0f);
