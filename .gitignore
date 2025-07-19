@@ -1,0 +1,9 @@
+#build files
+sven
+a.out
+
+# build dir
+build/
+
+# vscode
+.vscode/
