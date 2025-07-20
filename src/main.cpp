@@ -96,7 +96,7 @@ private:
     float terrainScale;
 
     // Instanced rendering parameters
-    const int nbGrassElemSide = 300; // Larger grid to cover whole terrain
+    const int nbGrassElemSide = 900; // Larger grid to cover whole terrain
     const float sizeToDraw = 100.0f; // Match actual terrain size (1000x1000 units)
     uint nbGrassToDraw;
 
@@ -226,15 +226,19 @@ private:
         srand(time(0));
 
         // Generate grass matrices in a grid pattern like the reference
+        float terrainMinX = -150.0f;
+        float terrainMaxX = 150.0f;
+        float terrainMinZ = -150.0f;
+        float terrainMaxZ = 150.0f;
+
         for (int i = 0; i < nbGrassElemSide; i++)
         {
             for (int j = 0; j < nbGrassElemSide; j++)
             {
-                // Calculate position in world space (similar to reference)
-                float posX = -(sizeToDraw / 2.0f) * (1 - (float(i) / (nbGrassElemSide - 1))) +
-                             (sizeToDraw / 2.0f) * (float(i) / (nbGrassElemSide - 1));
-                float posZ = -(sizeToDraw / 2.0f) * (1 - (float(j) / (nbGrassElemSide - 1))) +
-                             (sizeToDraw / 2.0f) * (float(j) / (nbGrassElemSide - 1));
+                float posX =
+                    terrainMinX + (terrainMaxX - terrainMinX) * (float(i) / (nbGrassElemSide - 1));
+                float posZ =
+                    terrainMinZ + (terrainMaxZ - terrainMinZ) * (float(j) / (nbGrassElemSide - 1));
 
                 // Add small random offset
                 int valRand = rand() % 1000;
@@ -704,7 +708,7 @@ int main()
     }
     glfwMakeContextCurrent(window);
     // VSYNC
-    // glfwSwapInterval(0);
+    glfwSwapInterval(0);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
@@ -936,91 +940,91 @@ int main()
     }
 
     // Generate terrain
-    // int terrainWidth = 100;
-    // int terrainHeight = 100;
-    // float terrainScale = 10.0f;
+    int terrainWidth = 100;
+    int terrainHeight = 100;
+    float terrainScale = 10.0f;
 
-    // std::vector<TerrainVertex> terrainVertices =
-    //     generateTerrainVertices(terrainWidth, terrainHeight, terrainScale);
-    // std::vector<unsigned int> terrainIndices = generateTerrainIndices(terrainWidth, terrainHeight);
+    std::vector<TerrainVertex> terrainVertices =
+        generateTerrainVertices(terrainWidth, terrainHeight, terrainScale);
+    std::vector<unsigned int> terrainIndices = generateTerrainIndices(terrainWidth, terrainHeight);
 
-    // // Create terrain VAO and VBO
-    // GLuint terrainVAO, terrainVBO, terrainEBO;
-    // glGenVertexArrays(1, &terrainVAO);
-    // glGenBuffers(1, &terrainVBO);
-    // glGenBuffers(1, &terrainEBO);
+    // Create terrain VAO and VBO
+    GLuint terrainVAO, terrainVBO, terrainEBO;
+    glGenVertexArrays(1, &terrainVAO);
+    glGenBuffers(1, &terrainVBO);
+    glGenBuffers(1, &terrainEBO);
 
-    // glBindVertexArray(terrainVAO);
+    glBindVertexArray(terrainVAO);
 
-    // glBindBuffer(GL_ARRAY_BUFFER, terrainVBO);
-    // glBufferData(GL_ARRAY_BUFFER, terrainVertices.size() * sizeof(TerrainVertex),
-    //              terrainVertices.data(), GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, terrainVBO);
+    glBufferData(GL_ARRAY_BUFFER, terrainVertices.size() * sizeof(TerrainVertex),
+                 terrainVertices.data(), GL_STATIC_DRAW);
 
-    // // Position attribute
-    // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(TerrainVertex), (void*)0);
-    // glEnableVertexAttribArray(0);
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(TerrainVertex), (void*)0);
+    glEnableVertexAttribArray(0);
 
-    // // Texture coordinate attribute
-    // glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(TerrainVertex),
-    //                       (void*)offsetof(TerrainVertex, texCoord));
-    // glEnableVertexAttribArray(1);
+    // Texture coordinate attribute
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(TerrainVertex),
+                          (void*)offsetof(TerrainVertex, texCoord));
+    glEnableVertexAttribArray(1);
 
-    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, terrainEBO);
-    // glBufferData(GL_ELEMENT_ARRAY_BUFFER, terrainIndices.size() * sizeof(unsigned int),
-    //              terrainIndices.data(), GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, terrainEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, terrainIndices.size() * sizeof(unsigned int),
+                 terrainIndices.data(), GL_STATIC_DRAW);
 
     glBindVertexArray(0);
 
     // Create a procedural terrain texture
-    // GLuint grassTexture;
-    // glGenTextures(1, &grassTexture);
-    // glBindTexture(GL_TEXTURE_2D, grassTexture);
+    GLuint grassTexture;
+    glGenTextures(1, &grassTexture);
+    glBindTexture(GL_TEXTURE_2D, grassTexture);
 
     // Generate a procedural grass texture
-    // const int texSize = 256;
-    // std::vector<unsigned char> textureData(texSize * texSize * 4);
+    const int texSize = 256;
+    std::vector<unsigned char> textureData(texSize * texSize * 4);
 
-    // FastNoiseLite textureNoise;
-    // textureNoise.SetSeed(42);
-    // textureNoise.SetNoiseType(FastNoiseLite::NoiseType_Perlin);
-    // textureNoise.SetFrequency(0.1f);
-    // textureNoise.SetFractalType(FastNoiseLite::FractalType_FBm);
-    // textureNoise.SetFractalOctaves(3);
+    FastNoiseLite textureNoise;
+    textureNoise.SetSeed(42);
+    textureNoise.SetNoiseType(FastNoiseLite::NoiseType_Perlin);
+    textureNoise.SetFrequency(0.1f);
+    textureNoise.SetFractalType(FastNoiseLite::FractalType_FBm);
+    textureNoise.SetFractalOctaves(3);
 
-    // for (int y = 0; y < texSize; ++y)
-    // {
-    //     for (int x = 0; x < texSize; ++x)
-    //     {
-    //         float noise = textureNoise.GetNoise((float)x, (float)y);
-    //         int index = (y * texSize + x) * 4;
+    for (int y = 0; y < texSize; ++y)
+    {
+        for (int x = 0; x < texSize; ++x)
+        {
+            float noise = textureNoise.GetNoise((float)x, (float)y);
+            int index = (y * texSize + x) * 4;
 
-    //         // Create grass-like texture with variation
-    //         unsigned char green = 100 + (unsigned char)(noise * 50);
-    //         unsigned char red = 20 + (unsigned char)(noise * 30);
-    //         unsigned char blue = 20 + (unsigned char)(noise * 20);
+            // Create grass-like texture with variation
+            unsigned char green = 100 + (unsigned char)(noise * 50);
+            unsigned char red = 20 + (unsigned char)(noise * 30);
+            unsigned char blue = 20 + (unsigned char)(noise * 20);
 
-    //         textureData[index] = red; // R
-    //         textureData[index + 1] = green; // G
-    //         textureData[index + 2] = blue; // B
-    //         textureData[index + 3] = 255; // A
-    //     }
-    // }
+            textureData[index] = red; // R
+            textureData[index + 1] = green; // G
+            textureData[index + 2] = blue; // B
+            textureData[index + 3] = 255; // A
+        }
+    }
 
-    // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texSize, texSize, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-    //              textureData.data());
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // glGenerateMipmap(GL_TEXTURE_2D);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texSize, texSize, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                 textureData.data());
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glGenerateMipmap(GL_TEXTURE_2D);
 
-    // // Initialize grass manager
-    // grassManager = new GrassManager();
-    // grassManager->init(&terrainVertices, terrainWidth, terrainHeight, terrainScale);
+    // Initialize grass manager
+    grassManager = new GrassManager();
+    grassManager->init(&terrainVertices, terrainWidth, terrainHeight, terrainScale);
 
-    // // Initialize geometry shader version (placeholder)
-    // grassManagerGeom = new GrassManagerGeom();
-    // grassManagerGeom->init(&terrainVertices, terrainWidth, terrainHeight, terrainScale);
+    // Initialize geometry shader version (placeholder)
+    grassManagerGeom = new GrassManagerGeom();
+    grassManagerGeom->init(&terrainVertices, terrainWidth, terrainHeight, terrainScale);
 
     // float rotationX = 0.0f;
     // float rotationY = 0.0f;
@@ -1033,9 +1037,9 @@ int main()
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
-    Grass grass;
+    // Grass grass;
 
-    grass.init();
+    // grass.init();
 
     // Camera UBO for compute shader
     GLuint camera_ubo;
@@ -1131,10 +1135,10 @@ int main()
             glBindVertexArray(0);
         }
 
-        grass.update(deltaTime);
+        // grass.update(deltaTime);
         // Draw terrain
-        // glActiveTexture(GL_TEXTURE0);
-        // glBindTexture(GL_TEXTURE_2D, grassTexture);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, grassTexture);
         shader.setInt("texture1", 0);
 
         glm::mat4 terrainModel = glm::mat4(1.0f);
@@ -1142,17 +1146,17 @@ int main()
             glm::translate(terrainModel, glm::vec3(-50.0f, 0.0f, -50.0f)); // Center the terrain
         shader.setMat4("model", terrainModel);
 
-        // glBindVertexArray(terrainVAO);
-        // glDrawElements(GL_TRIANGLES, terrainIndices.size(), GL_UNSIGNED_INT, 0);
+        glBindVertexArray(terrainVAO);
+        glDrawElements(GL_TRIANGLES, terrainIndices.size(), GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
         // Draw grass using GrassManager
-        // grassManager->setCameraPosition(camPos);
-        // grassManager->setViewMatrix(view);
-        // grassManager->setProjectionMatrix(projection);
-        // grassManager->draw();
+        grassManager->setCameraPosition(camPos);
+        grassManager->setViewMatrix(view);
+        grassManager->setProjectionMatrix(projection);
+        grassManager->draw();
 
-        grass.render();
+        // grass.render();
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -1178,10 +1182,10 @@ int main()
     }
 
     // Cleanup terrain
-    // glDeleteVertexArrays(1, &terrainVAO);
-    // glDeleteBuffers(1, &terrainVBO);
-    // glDeleteBuffers(1, &terrainEBO);
-    // glDeleteTextures(1, &grassTexture);
+    glDeleteVertexArrays(1, &terrainVAO);
+    glDeleteBuffers(1, &terrainVBO);
+    glDeleteBuffers(1, &terrainEBO);
+    glDeleteTextures(1, &grassTexture);
 
     // Cleanup grass managers
     if (grassManager)
