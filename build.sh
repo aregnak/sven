@@ -2,4 +2,6 @@
 
 set -e
 
-g++ src/*.cpp src/glad.c -I ./include -lglfw -ldl -lGL -o sven
+if (g++ src/*.cpp src/glad.c -I ./include -lglfw -ldl -lGL -o sven); then
+    ./sven
+fi
