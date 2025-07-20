@@ -616,8 +616,6 @@ int main()
 
     float deltaTime = 0.f;
     float lastFrame = 0.f;
-    int frames = 0;
-    float fpsTimer = 0.f;
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -630,16 +628,6 @@ int main()
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
-        frames++;
-        fpsTimer += deltaTime;
-        if (fpsTimer >= 1.f)
-        {
-            // std::cout << "FPS: " << frames << " | Frame time: " << (1000.0f / frames) << " ms"
-            //          << std::endl;
-            frames = 0;
-            fpsTimer = 0.0f;
-        }
-
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
@@ -647,12 +635,6 @@ int main()
         ImGui::Begin("Debug");
         ImGui::Text("FPS: %.1f", 1.0f / deltaTime);
         ImGui::Text("Delta Time: %.4f", deltaTime);
-        ImGui::Text("Camera Yaw: %.2f", yaw);
-        ImGui::Text("Camera Pitch: %.2f", pitch);
-        ImGui::Text("Player Position: (%.2f, %.2f, %.2f)", player.getPosition().x,
-                    player.getPosition().y, player.getPosition().z);
-        ImGui::Text("Player Rotation Y: %.2f", yaw + 90.0f);
-        ImGui::Text("Camera Distance: %.2f", cameraDistance);
         ImGui::End();
 
         glfwPollEvents();
