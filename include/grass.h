@@ -17,9 +17,7 @@ public:
     float wind_wave_length = 1.0;
     float wind_wave_period = 1.0;
 
-    using DeltaDuration = std::chrono::duration<float, std::milli>;
-
     void init();
-    void update(DeltaDuration delta_time);
+    void update(float delta_time);
     void render();
 };

@@ -111,11 +111,11 @@ void Grass::init()
                         .build();
 }
 
-void Grass::update(DeltaDuration delta_time)
+void Grass::update(float delta_time)
 {
     grass_compute_shader_.use();
     grass_compute_shader_.setFloat("current_time", static_cast<float>(glfwGetTime()));
-    grass_compute_shader_.setFloat("delta_time", delta_time.count() / 1e3f);
+    grass_compute_shader_.setFloat("delta_time", delta_time);
     grass_compute_shader_.setFloat("wind_magnitude", wind_magnitude);
     grass_compute_shader_.setFloat("wind_wave_length", wind_wave_length);
     grass_compute_shader_.setFloat("wind_wave_period", wind_wave_period);
