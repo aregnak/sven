@@ -123,6 +123,8 @@ public:
     ShaderBuilder& load(std::string_view filename, Shader::Type type)
     {
         const std::string src = Shader::readFile(filename);
+        std::cerr << "Loading shader: " << filename << std::endl;
+        std::cerr << "Shader source:\n" << src << std::endl;
         shaders_.emplace_back(src.c_str(), type);
         return *this;
     }

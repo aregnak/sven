@@ -16,6 +16,7 @@ public:
     float wind_magnitude = 1.0;
     float wind_wave_length = 1.0;
     float wind_wave_period = 1.0;
+    bool computeDispatched_ = false;
 
     void init();
     void update(float delta_time);

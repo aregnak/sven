@@ -495,7 +495,7 @@ void traverseScene(const tinygltf::Model& model, int nodeIndex,
     if (node.mesh >= 0)
     {
         meshTransforms[node.mesh] = worldTransform;
-        std::cout << "Found mesh " << node.mesh << " at node " << nodeIndex << std::endl;
+        //std::cout << "Found mesh " << node.mesh << " at node " << nodeIndex << std::endl;
     }
 
     // Traverse children
@@ -679,6 +679,15 @@ std::vector<unsigned int> generateTerrainIndices(int width, int height)
     return indices;
 }
 
+// Add this struct at the top, after includes
+struct CameraBufferObject
+{
+    glm::mat4 view;
+    glm::mat4 proj;
+    glm::vec3 position;
+    float _pad = 0.0f; // Padding to align to 16 bytes
+};
+
 int main()
 {
     glfwInit();
@@ -722,7 +731,7 @@ int main()
     // Player model
     Player player(glm::vec3(0.0f, 15.0f, 15.0f)); // Start above terrain
 
-    bool ret = loader.LoadBinaryFromFile(&model, &err, &warn, "Assets/Characters/gltf/Knight.glb");
+    bool ret = loader.LoadBinaryFromFile(&model, &err, &warn, "Assets/Characters/gltf/Mage.glb");
 
     if (!warn.empty())
         std::cout << "Warn: " << warn << std::endl;
@@ -772,31 +781,31 @@ int main()
             { // This node has a mesh
                 glm::mat4 completeTransform = buildNodeTransform(model, nodeIndex, nodeTransforms);
                 meshTransforms[node.mesh] = completeTransform;
-                std::cout << "Mesh " << node.mesh << " transform: " << std::endl;
-                for (int i = 0; i < 4; ++i)
-                {
-                    for (int j = 0; j < 4; ++j)
-                    {
-                        std::cout << completeTransform[i][j] << " ";
-                    }
-                    std::cout << std::endl;
-                }
+                //std::cout << "Mesh " << node.mesh << " transform: " << std::endl;
+                // for (int i = 0; i < 4; ++i)
+                // {
+                //     for (int j = 0; j < 4; ++j)
+                //     {
+                //         std::cout << completeTransform[i][j] << " ";
+                //     }
+                //     std::cout << std::endl;
+                // }
             }
         }
     }
 
-    std::cout << "Total meshes: " << model.meshes.size() << std::endl;
-    std::cout << "Total nodes: " << model.nodes.size() << std::endl;
-    std::cout << "Total scenes: " << model.scenes.size() << std::endl;
+    // std::cout << "Total meshes: " << model.meshes.size() << std::endl;
+    // std::cout << "Total nodes: " << model.nodes.size() << std::endl;
+    // std::cout << "Total scenes: " << model.scenes.size() << std::endl;
 
     if (!model.scenes.empty())
     {
         const auto& defaultScene = model.scenes[model.defaultScene >= 0 ? model.defaultScene : 0];
-        std::cout << "Default scene nodes: " << defaultScene.nodes.size() << std::endl;
-        for (int nodeIndex : defaultScene.nodes)
-        {
-            std::cout << "Scene node: " << nodeIndex << std::endl;
-        }
+        // std::cout << "Default scene nodes: " << defaultScene.nodes.size() << std::endl;
+        // for (int nodeIndex : defaultScene.nodes)
+        // {
+        //     std::cout << "Scene node: " << nodeIndex << std::endl;
+        // }
     }
 
     for (size_t meshIndex = 0; meshIndex < model.meshes.size(); ++meshIndex)
@@ -1028,6 +1037,13 @@ int main()
 
     grass.init();
 
+    // Camera UBO for compute shader
+    GLuint camera_ubo;
+    glGenBuffers(1, &camera_ubo);
+    glBindBuffer(GL_UNIFORM_BUFFER, camera_ubo);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(CameraBufferObject), nullptr, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, camera_ubo); // Bind to binding = 0
+
     while (!glfwWindowShouldClose(window))
     {
         float currentFrame = glfwGetTime();
@@ -1089,9 +1105,16 @@ int main()
         camPos.z = playerPos.z - horizontalDistance * sin(glm::radians(yaw));
 
         glm::mat4 view = glm::lookAt(camPos, playerPos, glm::vec3(0.0f, 1.0f, 0.0f));
-
         glm::mat4 projection =
             glm::perspective(glm::radians(60.0f), (float)SCR_WIDTH / SCR_HEIGHT, 0.1f, 100.0f);
+
+        // Update camera UBO for compute shader
+        CameraBufferObject camubo;
+        camubo.view = view;
+        camubo.proj = projection;
+        camubo.position = camPos;
+        glBindBuffer(GL_UNIFORM_BUFFER, camera_ubo);
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(CameraBufferObject), &camubo);
 
         shader.setMat4("view", view);
         shader.setMat4("projection", projection);

@@ -6,6 +6,18 @@
 #include <glm/ext/scalar_constants.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/noise.hpp>
+#include <iostream>
+#include <cstring>
+
+// Utility to print OpenGL errors
+void printGLErrors(const char* context)
+{
+    GLenum err;
+    while ((err = glGetError()) != GL_NO_ERROR)
+    {
+        std::cerr << "OpenGL error in " << context << ": " << err << std::endl;
+    }
+}
 
 struct NumBlades
 {
@@ -27,9 +39,9 @@ std::vector<Blade> generate_blades()
 
     std::vector<Blade> blades;
     // Generate grass blades using jittered stratified sampling
-    for (int i = -200; i < 200; ++i)
+    for (int i = -32; i < 32; ++i)
     {
-        for (int j = -200; j < 200; ++j)
+        for (int j = -32; j < 32; ++j)
         {
             const float x = static_cast<float>(i) / 10 - 1 + dis(gen) * 0.1f;
             const float y = static_cast<float>(j) / 10 - 1 + dis(gen) * 0.1f;
@@ -47,15 +59,24 @@ std::vector<Blade> generate_blades()
 
 } // anonymous namespace
 
+void printOpenGLVersion()
+{
+    const GLubyte* version = glGetString(GL_VERSION);
+    std::cout << "OpenGL version: " << (version ? reinterpret_cast<const char*>(version) : "(null)")
+              << std::endl;
+}
+
 void Grass::init()
 {
     const std::vector<Blade> blades = generate_blades();
     blades_count_ = static_cast<GLuint>(blades.size());
 
     glPatchParameteri(GL_PATCH_VERTICES, 1);
+    printGLErrors("glPatchParameteri");
 
     glGenVertexArrays(1, &grass_vao_);
     glBindVertexArray(grass_vao_);
+    printGLErrors("glGenVertexArrays/glBindVertexArray");
 
     unsigned int grass_input_buffer = 0;
     glGenBuffers(1, &grass_input_buffer);
@@ -64,6 +85,7 @@ void Grass::init()
     glBufferData(GL_SHADER_STORAGE_BUFFER, static_cast<GLsizei>(blades.size() * sizeof(Blade)),
                  blades.data(), GL_DYNAMIC_COPY);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, grass_input_buffer);
+    printGLErrors("input buffer setup");
 
     unsigned int grass_output_buffer = 0;
     glGenBuffers(1, &grass_output_buffer);
@@ -71,6 +93,7 @@ void Grass::init()
     glBufferData(GL_SHADER_STORAGE_BUFFER, static_cast<GLsizei>(blades.size() * sizeof(Blade)),
                  nullptr, GL_STREAM_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, grass_output_buffer);
+    printGLErrors("output buffer setup");
 
     NumBlades numBlades;
     unsigned int grass_indirect_buffer = 0;
@@ -79,6 +102,7 @@ void Grass::init()
     glBufferData(GL_DRAW_INDIRECT_BUFFER, sizeof(NumBlades), &numBlades, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, grass_output_buffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, grass_indirect_buffer);
+    printGLErrors("indirect buffer setup");
 
     // v0 attribute
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Blade),
@@ -99,36 +123,86 @@ void Grass::init()
     glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Blade),
                           reinterpret_cast<void*>(offsetof(Blade, up)));
     glEnableVertexAttribArray(3);
+    printGLErrors("vertex attrib setup");
 
-    grass_compute_shader_ =
-        ShaderBuilder{}.load("shaders/grass.comp.glsl", Shader::Type::Compute).build();
-    grass_compute_shader_.use();
+    try
+    {
+        grass_compute_shader_ =
+            ShaderBuilder{}.load("shaders/grass.comp.glsl", Shader::Type::Compute).build();
+        grass_compute_shader_.use();
+        printGLErrors("compute shader setup");
 
-    grass_shader_ = ShaderBuilder{}
-                        .load("shaders/grass.vert.glsl", Shader::Type::Vertex)
-                        .load("shaders/grass.tesc.glsl", Shader::Type::TessControl)
-                        .load("shaders/grass.tese.glsl", Shader::Type::TessEval)
-                        .load("shaders/grass.frag.glsl", Shader::Type::Fragment)
-                        .build();
+        grass_shader_ = ShaderBuilder{}
+                            .load("shaders/grass.vert.glsl", Shader::Type::Vertex)
+                            .load("shaders/grass.tesc.glsl", Shader::Type::TessControl)
+                            .load("shaders/grass.tese.glsl", Shader::Type::TessEval)
+                            .load("shaders/grass.frag.glsl", Shader::Type::Fragment)
+                            .build();
+        printGLErrors("graphics shader setup");
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "Shader error: " << e.what() << std::endl;
+    }
 }
 
 void Grass::update(float delta_time)
 {
-    grass_compute_shader_.use();
-    grass_compute_shader_.setFloat("current_time", static_cast<float>(glfwGetTime()));
-    grass_compute_shader_.setFloat("delta_time", delta_time);
-    grass_compute_shader_.setFloat("wind_magnitude", wind_magnitude);
-    grass_compute_shader_.setFloat("wind_wave_length", wind_wave_length);
-    grass_compute_shader_.setFloat("wind_wave_period", wind_wave_period);
+    computeDispatched_ = false;
+    std::cout << "blades_count_: " << blades_count_ << std::endl;
+    GLint currentProgram = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &currentProgram);
+    std::cout << "Current program before compute: " << currentProgram << std::endl;
+    // Check if the compute shader program is valid and linked
+    GLint linkStatus = 0;
+    glGetProgramiv(grass_compute_shader_.id(), GL_LINK_STATUS, &linkStatus);
+    std::cout << "Compute shader link status: " << linkStatus << std::endl;
 
-    glDispatchCompute(blades_count_, 1, 1);
+    // Print SSBO and indirect buffer bindings
+    GLint ssbo1 = 0, ssbo2 = 0, ssbo3 = 0;
+    glGetIntegeri_v(GL_SHADER_STORAGE_BUFFER_BINDING, 1, &ssbo1);
+    glGetIntegeri_v(GL_SHADER_STORAGE_BUFFER_BINDING, 2, &ssbo2);
+    glGetIntegeri_v(GL_SHADER_STORAGE_BUFFER_BINDING, 3, &ssbo3);
+    GLint indirectBuffer = 0;
+    glGetIntegerv(GL_DRAW_INDIRECT_BUFFER_BINDING, &indirectBuffer);
+    std::cout << "SSBO1 (input): " << ssbo1 << ", SSBO2 (output): " << ssbo2
+              << ", SSBO3 (indirect): " << ssbo3 << std::endl;
+    std::cout << "Indirect buffer: " << indirectBuffer << std::endl;
+
+    // Print UBO0 binding
+    GLint ubo0 = 0;
+    glGetIntegeri_v(GL_UNIFORM_BUFFER_BINDING, 0, &ubo0);
+    std::cout << "UBO0 (camera): " << ubo0 << std::endl;
+
+    if (blades_count_ > 0)
+    {
+        grass_compute_shader_.use();
+        glGetIntegerv(GL_CURRENT_PROGRAM, &currentProgram);
+        std::cout << "Current program after use(): " << currentProgram << std::endl;
+        // set uniforms...
+        glDispatchCompute(blades_count_, 1, 1);
+        GLenum err = glGetError();
+        if (err != GL_NO_ERROR)
+        {
+            std::cerr << "OpenGL error after glDispatchCompute: " << err << std::endl;
+        }
+        printGLErrors("glDispatchCompute");
+        computeDispatched_ = true;
+    }
 }
 
 void Grass::render()
 {
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    if (computeDispatched_)
+    {
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        printGLErrors("glMemoryBarrier");
+    }
 
     glBindVertexArray(grass_vao_);
+    printGLErrors("glBindVertexArray");
     grass_shader_.use();
+    printGLErrors("graphics shader use");
     glDrawArraysIndirect(GL_PATCHES, reinterpret_cast<void*>(0));
+    printGLErrors("glDrawArraysIndirect");
 }
