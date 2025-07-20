@@ -1121,6 +1121,24 @@ int main()
         camPos.y = playerPos.y + cameraHeight + verticalOffset;
         camPos.z = playerPos.z - horizontalDistance * sin(glm::radians(yaw));
 
+        // If camera is below terrain, move it closer to the player until it's above
+        float minCameraHeight = 0.5f; // Minimum height above terrain
+        float terrainY = grassManager->getTerrainHeight(camPos.x, camPos.z);
+
+        // If camera is below terrain, move it closer to the player until it's above
+        if (camPos.y < terrainY + minCameraHeight)
+        {
+            glm::vec3 toPlayer = glm::normalize(playerPos - camPos);
+            float step = 0.1f; // How much to move per iteration (tune as needed)
+            int maxSteps = 100; // Prevent infinite loop
+
+            for (int i = 0; i < maxSteps && camPos.y < terrainY + minCameraHeight; ++i)
+            {
+                camPos += toPlayer * step;
+                terrainY = grassManager->getTerrainHeight(camPos.x, camPos.z);
+            }
+        }
+
         glm::mat4 view = glm::lookAt(camPos, playerPos, glm::vec3(0.0f, 1.0f, 0.0f));
         glm::mat4 projection =
             glm::perspective(glm::radians(60.0f), (float)SCR_WIDTH / SCR_HEIGHT, 0.1f, 100.0f);
