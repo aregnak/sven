@@ -100,14 +100,15 @@ void Grass::init()
                           reinterpret_cast<void*>(offsetof(Blade, up)));
     glEnableVertexAttribArray(3);
 
-    grass_compute_shader_ = ShaderBuilder{}.load("grass.comp.glsl", Shader::Type::Compute).build();
+    grass_compute_shader_ =
+        ShaderBuilder{}.load("shaders/grass.comp.glsl", Shader::Type::Compute).build();
     grass_compute_shader_.use();
 
     grass_shader_ = ShaderBuilder{}
-                        .load("grass.vert.glsl", Shader::Type::Vertex)
-                        .load("grass.tesc.glsl", Shader::Type::TessControl)
-                        .load("grass.tese.glsl", Shader::Type::TessEval)
-                        .load("grass.frag.glsl", Shader::Type::Fragment)
+                        .load("shaders/grass.vert.glsl", Shader::Type::Vertex)
+                        .load("shaders/grass.tesc.glsl", Shader::Type::TessControl)
+                        .load("shaders/grass.tese.glsl", Shader::Type::TessEval)
+                        .load("shaders/grass.frag.glsl", Shader::Type::Fragment)
                         .build();
 }
 

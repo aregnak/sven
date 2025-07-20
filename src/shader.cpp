@@ -118,6 +118,12 @@ std::string Shader::readFile(std::string_view filename)
     return buffer.str();
 }
 
+// Default constructor
+ShaderProgram::ShaderProgram()
+    : id_(0)
+{
+}
+
 ShaderProgram::ShaderProgram(const std::vector<Shader>& shaders)
     : id_{ glCreateProgram() }
 {
