@@ -12,13 +12,13 @@ void Player::processInput(float deltaTime, bool forward, bool backward, bool lef
     glm::vec3 direction(0.0f);
 
     if (forward)
-        direction.z -= 1.0f;
-    if (backward)
         direction.z += 1.0f;
+    if (backward)
+        direction.z -= 1.0f;
     if (left)
-        direction.x -= 1.0f;
-    if (right)
         direction.x += 1.0f;
+    if (right)
+        direction.x -= 1.0f;
 
     if (glm::length(direction) > 0.0f)
         move(glm::normalize(direction), deltaTime);
