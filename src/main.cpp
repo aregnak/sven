@@ -5,6 +5,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 #include <map>
+#include <algorithm>
 #include "shader.h"
 
 #define TINYGLTF_IMPLEMENTATION
@@ -13,6 +14,15 @@
 #include "tiny_gltf.h"
 
 #include "player.h"
+
+// Camera Controls:
+// - Mouse: Look around the character
+// - TAB: Toggle mouse capture (free cursor / locked camera)
+// - Mouse Wheel: Zoom in/out
+// - Q/E: Zoom in/out (alternative to mouse wheel)
+// - WASD: Move character
+// - SPACE: Jump
+// - ESC: Exit
 
 // Helper function to extract transformation from a glTF node
 glm::mat4 getNodeTransform(const tinygltf::Node& node)
@@ -127,9 +137,59 @@ glm::mat4 buildNodeTransform(const tinygltf::Model& model, int nodeIndex,
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
 
+// Camera control variables
+float lastX = SCR_WIDTH / 2.0f;
+float lastY = SCR_HEIGHT / 2.0f;
+bool firstMouse = true;
+float yaw = -90.0f; // Horizontal rotation
+float pitch = 0.0f; // Vertical rotation
+float cameraDistance = 5.0f; // Distance from player
+float cameraHeight = 8.0f; // Height above player
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
+}
+
+void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
+{
+    float xpos = static_cast<float>(xposIn);
+    float ypos = static_cast<float>(yposIn);
+
+    if (firstMouse)
+    {
+        lastX = xpos;
+        lastY = ypos;
+        firstMouse = false;
+    }
+
+    float xoffset = xpos - lastX;
+    float yoffset = ypos - lastY;
+
+    lastX = xpos;
+    lastY = ypos;
+
+    float sensitivity = 0.1f;
+    xoffset *= sensitivity;
+    yoffset *= sensitivity;
+
+    yaw += xoffset;
+    pitch += yoffset;
+
+    // make sure that when pitch is out of bounds, screen doesn't get flipped
+    if (pitch > 89.0f)
+        pitch = 89.0f;
+    if (pitch < -89.0f)
+        pitch = -89.0f;
+}
+
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+    cameraDistance -= (float)yoffset;
+    if (cameraDistance < 2.0f)
+        cameraDistance = 2.0f;
+    if (cameraDistance > 15.0f)
+        cameraDistance = 15.0f;
 }
 
 int main()
@@ -148,6 +208,11 @@ int main()
     }
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetScrollCallback(window, scroll_callback);
+
+    // tell GLFW to capture our mouse
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -164,20 +229,6 @@ int main()
     tinygltf::Model model;
     tinygltf::TinyGLTF loader;
     std::string err, warn;
-
-    // bool ret = loader.LoadASCIIFromFile(&model, &err, &warn,
-    //                                     "Assets/Environment/gltf/Tree_1_A_Color1.gltf");
-
-    // if (!warn.empty())
-    //     std::cout << "Warn: " << warn << std::endl;
-    // if (!err.empty())
-    //     std::cerr << "Err: " << err << std::endl;
-
-    // if (!ret)
-    // {
-    //     std::cerr << "Failed to load glTF" << std::endl;
-    //     return -1;
-    // }
 
     // Player model
     Player player(glm::vec3(0.0f, 0.0f, 15.0f));
@@ -406,36 +457,37 @@ int main()
         bool moveRight = glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS;
         bool jump = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
 
+        // Camera controls
+        static bool mouseCaptured = true;
+        if (glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS)
+        {
+            static bool tabPressed = false;
+            if (!tabPressed)
+            {
+                mouseCaptured = !mouseCaptured;
+                glfwSetInputMode(window, GLFW_CURSOR,
+                                 mouseCaptured ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+                tabPressed = true;
+            }
+        }
+        else
+        {
+            static bool tabPressed = false;
+            tabPressed = false;
+        }
+
+        // Adjust camera distance with mouse wheel (simulated with keys for now)
+        if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+        {
+            cameraDistance = std::max(2.0f, cameraDistance - 0.1f);
+        }
+        if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+        {
+            cameraDistance = std::min(15.0f, cameraDistance + 0.1f);
+        }
+
         player.processInput(deltaTime, moveForward, moveBackward, moveLeft, moveRight, jump);
         player.update(deltaTime);
-
-        // if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        // {
-        //     rotationX += 0.02f;
-        // }
-        // if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        // {
-        //     rotationY += 0.02f;
-        // }
-        // if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        // {
-        //     rotationX -= 0.02f;
-        // }
-        // if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        // {
-        //     rotationY -= 0.02f;
-        // }
-
-        // glm::mat4 modelMat = glm::mat4(1.0f); // Identity, or add rotation/translation if you want
-
-        // glm::mat4 modelMat = glm::mat4(1.0f);
-        // modelMat = glm::rotate(modelMat, 0.f, glm::vec3(1.0f, 0.0f, 0.0f)); // X axis
-        // modelMat = glm::rotate(modelMat, 0.f, glm::vec3(0.0f, 1.0f, 0.0f)); // Y axis
-
-        // glm::mat4 view =
-        //     glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -10.0f)); // Move camera back
-        // glm::mat4 projection =
-        //     glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / SCR_HEIGHT, 0.1f, 100.0f);
 
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -451,10 +503,14 @@ int main()
         // Position the character at the player's location
         modelMat = glm::translate(modelMat, player.getPosition());
 
-        glm::vec3 camPos = player.getPosition() +
-                           glm::vec3(0.0f, 2.0f, 5.0f); // Camera behind and slightly above player
-        glm::vec3 camTarget = player.getPosition(); // Camera looks at the player
-        glm::mat4 view = glm::lookAt(camPos, camTarget, glm::vec3(0.0f, 1.0f, 0.0f));
+        // Calculate camera position based on mouse angles
+        glm::vec3 playerPos = player.getPosition();
+        glm::vec3 camPos;
+        camPos.x = playerPos.x + cameraDistance * cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+        camPos.y = playerPos.y + cameraHeight + cameraDistance * sin(glm::radians(pitch));
+        camPos.z = playerPos.z + cameraDistance * sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+
+        glm::mat4 view = glm::lookAt(camPos, playerPos, glm::vec3(0.0f, 1.0f, 0.0f));
 
         glm::mat4 projection =
             glm::perspective(glm::radians(60.0f), (float)SCR_WIDTH / SCR_HEIGHT, 0.1f, 100.0f);
