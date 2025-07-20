@@ -647,6 +647,12 @@ int main()
         ImGui::Begin("Debug");
         ImGui::Text("FPS: %.1f", 1.0f / deltaTime);
         ImGui::Text("Delta Time: %.4f", deltaTime);
+        ImGui::Text("Camera Yaw: %.2f", yaw);
+        ImGui::Text("Camera Pitch: %.2f", pitch);
+        ImGui::Text("Player Position: (%.2f, %.2f, %.2f)", player.getPosition().x,
+                    player.getPosition().y, player.getPosition().z);
+        ImGui::Text("Player Rotation Y: %.2f", yaw + 90.0f);
+        ImGui::Text("Camera Distance: %.2f", cameraDistance);
         ImGui::End();
 
         glfwPollEvents();
@@ -657,7 +663,7 @@ int main()
         bool moveRight = glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS;
         bool jump = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
 
-        player.processInput(deltaTime, moveForward, moveBackward, moveLeft, moveRight, jump);
+        player.processInput(deltaTime, moveForward, moveBackward, moveLeft, moveRight, jump, yaw);
         player.update(deltaTime);
 
         // Regenerate terrain with R key
@@ -692,6 +698,13 @@ int main()
         // Position the character at the player's location
         modelMat = glm::translate(modelMat, player.getPosition());
 
+        // Rotate the player model to face the camera's forward direction
+        // The camera's forward direction is determined by the yaw angle
+        float playerRotationY =
+            -yaw + 90.0f; // Invert yaw and add 90 degrees to align with camera forward
+        modelMat =
+            glm::rotate(modelMat, glm::radians(playerRotationY), glm::vec3(0.0f, 1.0f, 0.0f));
+
         // Calculate camera position based on mouse angles
         glm::vec3 playerPos = player.getPosition();
         glm::vec3 camPos;
@@ -701,9 +714,9 @@ int main()
         float verticalOffset = cameraDistance * sin(glm::radians(pitch));
 
         // Calculate camera position
-        camPos.x = playerPos.x + horizontalDistance * cos(glm::radians(yaw));
+        camPos.x = playerPos.x - horizontalDistance * cos(glm::radians(yaw));
         camPos.y = playerPos.y + cameraHeight + verticalOffset;
-        camPos.z = playerPos.z + horizontalDistance * sin(glm::radians(yaw));
+        camPos.z = playerPos.z - horizontalDistance * sin(glm::radians(yaw));
 
         glm::mat4 view = glm::lookAt(camPos, playerPos, glm::vec3(0.0f, 1.0f, 0.0f));
 

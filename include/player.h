@@ -10,7 +10,7 @@ public:
     Player(glm::vec3 position);
 
     void processInput(float deltaTime, bool moveForward, bool moveBackward, bool moveLeft,
-                      bool moveRight, bool jump);
+                      bool moveRight, bool jump, float cameraYaw);
     void applyGravity(float deltaTime);
     void update(float deltaTime);
 

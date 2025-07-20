@@ -1,4 +1,5 @@
 #include "player.h"
+#include <iostream>
 
 Player::Player(glm::vec3 pos)
     : position(pos)
@@ -11,18 +12,29 @@ Player::Player(glm::vec3 pos)
 }
 
 void Player::processInput(float deltaTime, bool forward, bool backward, bool left, bool right,
-                          bool jump)
+                          bool jump, float cameraYaw)
 {
     glm::vec3 direction(0.0f);
 
+    // Convert camera yaw to radians
+    float yawRad = glm::radians(cameraYaw);
+
+    // Calculate forward and right vectors based on camera orientation
+    // Align with camera calculation in main.cpp: camPos.x = playerPos.x - horizontalDistance * cos(yaw)
+    // The camera's forward direction is the direction from camera to player (behind to front)
+    glm::vec3 forwardDir =
+        glm::vec3(cos(yawRad), 0.0f, sin(yawRad)); // Same as camera offset direction
+    // Camera right direction (perpendicular to forward)
+    glm::vec3 rightDir = glm::vec3(-sin(yawRad), 0.0f, cos(yawRad));
+
     if (forward)
-        direction.z += 1.0f;
+        direction += forwardDir;
     if (backward)
-        direction.z -= 1.0f;
+        direction -= forwardDir;
     if (left)
-        direction.x += 1.0f;
+        direction -= rightDir;
     if (right)
-        direction.x -= 1.0f;
+        direction += rightDir;
 
     if (glm::length(direction) > 0.0f)
         move(glm::normalize(direction), deltaTime);
