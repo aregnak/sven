@@ -652,12 +652,24 @@ int main()
 
     float deltaTime = 0.f;
     float lastFrame = 0.f;
+    int frames = 0;
+    float fpsTimer = 0.f;
 
     while (!glfwWindowShouldClose(window))
     {
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
+
+        frames++;
+        fpsTimer += deltaTime;
+        if (fpsTimer >= 1.f)
+        {
+            std::cout << "FPS: " << frames << " | Frame time: " << (1000.0f / frames) << " ms"
+                      << std::endl;
+            frames = 0;
+            fpsTimer = 0.0f;
+        }
 
         glfwPollEvents();
 
