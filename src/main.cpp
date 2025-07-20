@@ -143,8 +143,8 @@ float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
 float yaw = -90.0f; // Horizontal rotation
 float pitch = 0.0f; // Vertical rotation
-float cameraDistance = 5.0f; // Distance from player
-float cameraHeight = 8.0f; // Height above player
+float cameraDistance = 10.0f; // Distance from player
+float cameraHeight = 4.0f; // Height above player
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
@@ -186,8 +186,8 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
     cameraDistance -= (float)yoffset;
-    if (cameraDistance < 2.0f)
-        cameraDistance = 2.0f;
+    if (cameraDistance < 8.0f)
+        cameraDistance = 8.0f;
     if (cameraDistance > 15.0f)
         cameraDistance = 15.0f;
 }
@@ -506,9 +506,15 @@ int main()
         // Calculate camera position based on mouse angles
         glm::vec3 playerPos = player.getPosition();
         glm::vec3 camPos;
-        camPos.x = playerPos.x + cameraDistance * cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-        camPos.y = playerPos.y + cameraHeight + cameraDistance * sin(glm::radians(pitch));
-        camPos.z = playerPos.z + cameraDistance * sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+
+        // Calculate camera offset based on yaw and pitch
+        float horizontalDistance = cameraDistance * cos(glm::radians(pitch));
+        float verticalOffset = cameraDistance * sin(glm::radians(pitch));
+
+        // Calculate camera position
+        camPos.x = playerPos.x + horizontalDistance * cos(glm::radians(yaw));
+        camPos.y = playerPos.y + cameraHeight + verticalOffset;
+        camPos.z = playerPos.z + horizontalDistance * sin(glm::radians(yaw));
 
         glm::mat4 view = glm::lookAt(camPos, playerPos, glm::vec3(0.0f, 1.0f, 0.0f));
 
