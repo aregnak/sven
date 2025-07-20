@@ -137,46 +137,6 @@ glm::mat4 buildNodeTransform(const tinygltf::Model& model, int nodeIndex,
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
 
-const int GRID_SIZE = 100;
-const float SCALE = 1.0f;
-
-std::vector<float> generateTerrainVertices(FastNoiseLite& noise)
-{
-    std::vector<float> vertices;
-    for (int z = 0; z < GRID_SIZE; ++z)
-    {
-        for (int x = 0; x < GRID_SIZE; ++x)
-        {
-            float nx = (float)x / GRID_SIZE;
-            float nz = (float)z / GRID_SIZE;
-            float height = noise.GetNoise(nx * 10.0f, nz * 10.0f) * 5.0f; // scale height
-            vertices.insert(vertices.end(), { x * SCALE, height, z * SCALE });
-        }
-    }
-    return vertices;
-}
-
-std::vector<unsigned int> generateIndices()
-{
-    std::vector<unsigned int> indices;
-    for (int z = 0; z < GRID_SIZE - 1; ++z)
-    {
-        for (int x = 0; x < GRID_SIZE - 1; ++x)
-        {
-            int topLeft = z * GRID_SIZE + x;
-            int topRight = topLeft + 1;
-            int bottomLeft = topLeft + GRID_SIZE;
-            int bottomRight = bottomLeft + 1;
-
-            // First triangle
-            indices.insert(indices.end(), { topLeft, bottomLeft, topRight });
-            // Second triangle
-            indices.insert(indices.end(), { topRight, bottomLeft, bottomRight });
-        }
-    }
-    return indices;
-}
-
 // Camera control variables
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
@@ -659,6 +619,11 @@ int main()
     int frames = 0;
     float fpsTimer = 0.f;
 
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 330");
+
     while (!glfwWindowShouldClose(window))
     {
         float currentFrame = glfwGetTime();
@@ -669,11 +634,20 @@ int main()
         fpsTimer += deltaTime;
         if (fpsTimer >= 1.f)
         {
-            std::cout << "FPS: " << frames << " | Frame time: " << (1000.0f / frames) << " ms"
-                      << std::endl;
+            // std::cout << "FPS: " << frames << " | Frame time: " << (1000.0f / frames) << " ms"
+            //          << std::endl;
             frames = 0;
             fpsTimer = 0.0f;
         }
+
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        ImGui::Begin("Debug");
+        ImGui::Text("FPS: %.1f", 1.0f / deltaTime);
+        ImGui::Text("Delta Time: %.4f", deltaTime);
+        ImGui::End();
 
         glfwPollEvents();
 
@@ -765,6 +739,9 @@ int main()
         glDrawElements(GL_TRIANGLES, terrainIndices.size(), GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
         glfwSwapBuffers(window);
 
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -790,6 +767,11 @@ int main()
     glDeleteBuffers(1, &terrainVBO);
     glDeleteBuffers(1, &terrainEBO);
     glDeleteTextures(1, &grassTexture);
+
+    // Cleanup ImGui
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
 
     glfwTerminate();
     return 0;
