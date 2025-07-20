@@ -255,19 +255,16 @@ private:
                 // Create transformation matrix
                 glm::mat4 modelMatrix = glm::mat4(1.0f);
 
-                // Position on terrain
+                // Position on terrain (grass blade base should be at terrain height)
                 modelMatrix = glm::translate(modelMatrix, glm::vec3(posX, terrainHeight, posZ));
 
                 // Random rotation around Y axis
                 modelMatrix =
                     glm::rotate(modelMatrix, posX * posZ * 5.244f, glm::vec3(0.0f, 1.0f, 0.0f));
 
-                // Scale (similar to reference)
-                modelMatrix = glm::scale(modelMatrix, glm::vec3(0.3f, 1.7f, 0.3f));
+                // Scale (similar to reference) ter
+                modelMatrix = glm::scale(modelMatrix, glm::vec3(0.3f, 1.0f, 0.3f));
                 modelMatrix = glm::scale(modelMatrix, glm::vec3(1.0f, 1.0f + fRand, 1.0f));
-
-                // Move up slightly
-                modelMatrix = glm::translate(modelMatrix, glm::vec3(0.0f, 2.0f, 0.0f));
 
                 grassMatrices.push_back(modelMatrix);
             }
@@ -308,7 +305,7 @@ private:
         grassVertices.push_back(
             { glm::vec3(0.5f, 1.0f, 0.0f), glm::vec2(1.0f, 1.0f), glm::vec3(0.0f, 0.0f, 1.0f) });
 
-        grassIndices = { 0, 1, 2, 2, 1, 3 };
+        grassIndices = { 0, 1, 2, 1, 3 };
     }
 
     void createGrassTexture()
@@ -697,7 +694,7 @@ int main()
     }
     glfwMakeContextCurrent(window);
     // VSYNC
-    // glfwSwapInterval(0);
+    glfwSwapInterval(0);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
