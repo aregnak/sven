@@ -177,7 +177,6 @@ public:
         }
     }
 
-private:
     float getTerrainHeight(float worldX, float worldZ)
     {
         if (!terrainVertices)
@@ -218,6 +217,7 @@ private:
         return h0 * (1 - fz) + h1 * fz;
     }
 
+private:
     void generateGrassMatrices()
     {
         grassMatrices.clear();
@@ -226,10 +226,22 @@ private:
         srand(time(0));
 
         // Generate grass matrices in a grid pattern like the reference
-        float terrainMinX = -150.0f;
-        float terrainMaxX = 150.0f;
-        float terrainMinZ = -150.0f;
-        float terrainMaxZ = 150.0f;
+        float terrainMinX = -200.f;
+        float terrainMaxX = 200.f;
+        float terrainMinZ = -200.f;
+        float terrainMaxZ = 200.0f;
+
+        // float terrainMinX = std::numeric_limits<float>::max();
+        // float terrainMaxX = std::numeric_limits<float>::lowest();
+        // float terrainMinZ = std::numeric_limits<float>::max();
+        // float terrainMaxZ = std::numeric_limits<float>::lowest();
+        // for (const auto& v : *terrainVertices)
+        // {
+        //     terrainMinX = std::min(terrainMinX, v.position.x);
+        //     terrainMaxX = std::max(terrainMaxX, v.position.x);
+        //     terrainMinZ = std::min(terrainMinZ, v.position.z);
+        //     terrainMaxZ = std::max(terrainMaxZ, v.position.z);
+        // }
 
         for (int i = 0; i < nbGrassElemSide; i++)
         {
@@ -1072,7 +1084,8 @@ int main()
         bool jump = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
 
         player.processInput(deltaTime, moveForward, moveBackward, moveLeft, moveRight, jump, yaw);
-        player.update(deltaTime);
+        player.update(deltaTime, grassManager->getTerrainHeight(player.getPosition().x,
+                                                                player.getPosition().z));
 
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

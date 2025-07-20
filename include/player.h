@@ -11,8 +11,7 @@ public:
 
     void processInput(float deltaTime, bool moveForward, bool moveBackward, bool moveLeft,
                       bool moveRight, bool jump, float cameraYaw);
-    void applyGravity(float deltaTime);
-    void update(float deltaTime);
+    void update(float deltaTime, float terrainY);
 
     glm::vec3 getPosition() const;
     glm::vec3 getVelocity() const;

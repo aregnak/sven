@@ -48,23 +48,29 @@ void Player::processInput(float deltaTime, bool forward, bool backward, bool lef
 
 void Player::move(const glm::vec3& dir, float deltaTime) { position += dir * speed * deltaTime; }
 
-void Player::applyGravity(float deltaTime)
+void Player::update(float deltaTime, float terrainY)
 {
+    // Apply gravity if not grounded
     if (!isGrounded)
     {
         velocity.y += gravity * deltaTime;
-        position.y += velocity.y * deltaTime;
+    }
 
-        if (position.y <= 0.0f)
-        { // simple ground check
-            position.y = 0.0f;
-            isGrounded = true;
-            velocity.y = 0.0f;
-        }
+    // Apply velocity
+    position.y += velocity.y * deltaTime;
+
+    // Ground collision check
+    if (position.y <= terrainY)
+    {
+        position.y = terrainY;
+        isGrounded = true;
+        velocity.y = 0.0f;
+    }
+    else
+    {
+        isGrounded = false;
     }
 }
-
-void Player::update(float deltaTime) { applyGravity(deltaTime); }
 
 glm::vec3 Player::getPosition() const { return position; }
 
