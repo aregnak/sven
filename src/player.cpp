@@ -3,6 +3,10 @@
 Player::Player(glm::vec3 pos)
     : position(pos)
     , velocity(0.0f)
+    , speed(5.f)
+    , gravity(-9.8f)
+    , jumpStrength(5.f)
+    , isGrounded(false)
 {
 }
 

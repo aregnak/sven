@@ -21,10 +21,10 @@ public:
 private:
     glm::vec3 position;
     glm::vec3 velocity;
-    float speed = 5.0f;
-    float gravity = -9.8f;
-    float jumpStrength = 5.0f;
-    bool isGrounded = true;
+    float speed;
+    float gravity;
+    float jumpStrength;
+    bool isGrounded;
 
     void move(const glm::vec3& direction, float deltaTime);
 };

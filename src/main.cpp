@@ -535,7 +535,7 @@ int main()
     // Generate terrain
     int terrainWidth = 100;
     int terrainHeight = 100;
-    float terrainScale = 1.0f;
+    float terrainScale = 10.0f;
 
     std::vector<TerrainVertex> terrainVertices =
         generateTerrainVertices(terrainWidth, terrainHeight, terrainScale);
