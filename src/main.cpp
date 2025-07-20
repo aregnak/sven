@@ -97,6 +97,7 @@ private:
     // Instanced rendering parameters
     const int nbGrassElemSide = 200; // Reduced from 300 for performance
     const float sizeToDraw = 100.0f;
+    const float grassRenderDistance = 30.0f; // Distance around player to render grass
     uint nbGrassToDraw;
 
 public:
@@ -129,6 +130,36 @@ public:
     void setProjectionMatrix(const glm::mat4& proj) { projectionMatrix = proj; }
     void setCameraPosition(const glm::vec3& pos) { cameraPosition = pos; }
 
+    uint getVisibleGrassCount()
+    {
+        if (grassMatrices.empty())
+            return 0;
+
+        uint visibleCount = 0;
+        float renderDistanceSquared = grassRenderDistance * grassRenderDistance;
+
+        // Use player position (camera position is offset from player)
+        glm::vec3 playerPos = cameraPosition;
+
+        // Count grass blades within render distance of player
+        for (const auto& matrix : grassMatrices)
+        {
+            // Extract position from matrix (4th column)
+            glm::vec3 grassPos(matrix[3][0], matrix[3][1], matrix[3][2]);
+
+            // Calculate distance squared (avoiding sqrt for performance)
+            glm::vec3 diff = grassPos - playerPos;
+            float distanceSquared = diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
+
+            if (distanceSquared <= renderDistanceSquared)
+            {
+                visibleCount++;
+            }
+        }
+
+        return visibleCount;
+    }
+
     void draw()
     {
         if (!grassShader)
@@ -152,9 +183,10 @@ public:
 
         glBindVertexArray(grassVAO);
 
-        // Single instanced draw call for all grass blades
+        // Get visible grass count and draw only those
+        uint visibleCount = getVisibleGrassCount();
         glDrawElementsInstanced(GL_TRIANGLES, grassIndices.size(), GL_UNSIGNED_INT, 0,
-                                nbGrassToDraw);
+                                visibleCount);
 
         glBindVertexArray(0);
         glEnable(GL_CULL_FACE);
@@ -288,6 +320,33 @@ private:
         float dz = (down - up) / (2.0f * delta);
 
         return sqrt(dx * dx + dz * dz);
+    }
+
+    uint calculateVisibleGrassCount()
+    {
+        if (grassMatrices.empty())
+            return 0;
+
+        uint visibleCount = 0;
+        float renderDistanceSquared = grassRenderDistance * grassRenderDistance;
+
+        // Count grass blades within render distance of camera
+        for (const auto& matrix : grassMatrices)
+        {
+            // Extract position from matrix (4th column)
+            glm::vec3 grassPos(matrix[3][0], matrix[3][1], matrix[3][2]);
+
+            // Calculate distance squared (avoiding sqrt for performance)
+            glm::vec3 diff = grassPos - cameraPosition;
+            float distanceSquared = diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
+
+            if (distanceSquared <= renderDistanceSquared)
+            {
+                visibleCount++;
+            }
+        }
+
+        return visibleCount;
     }
 
     void createGrassGeometry()
