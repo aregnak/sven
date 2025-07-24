@@ -1,4 +1,4 @@
-#include "../include/grass.h"
+#include "grass.h"
 #include <random>
 #include <iostream>
 
