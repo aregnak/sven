@@ -24,21 +24,19 @@
 #define FASTNOISE_LITE_IMPLEMENTATION
 #include "FastNoiseLite.h"
 
-#include "player.h"
+#include "camera.h"
 #include "grass.h"
+#include "player.h"
 
 // Global variables
 const int SCR_WIDTH = 1280;
 const int SCR_HEIGHT = 720;
 
 // Camera variables
-float yaw = -90.0f;
-float pitch = 0.0f;
+Camera camera(glm::vec3(0.0f, 15.0f, 15.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
-float cameraDistance = 10.0f;
-float cameraHeight = 2.0f;
 
 // Helper function to extract transformation from a glTF node
 glm::mat4 getNodeTransform(const tinygltf::Node& node)
@@ -157,6 +155,10 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 {
+    static float lastX = SCR_WIDTH / 2.0f;
+    static float lastY = SCR_HEIGHT / 2.0f;
+    static bool firstMouse = true;
+
     float xpos = static_cast<float>(xposIn);
     float ypos = static_cast<float>(yposIn);
 
@@ -173,27 +175,12 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
     lastX = xpos;
     lastY = ypos;
 
-    float sensitivity = 0.1f;
-    xoffset *= sensitivity;
-    yoffset *= sensitivity;
-
-    yaw += xoffset;
-    pitch += yoffset;
-
-    // make sure that when pitch is out of bounds, screen doesn't get flipped
-    if (pitch > 89.0f)
-        pitch = 89.0f;
-    if (pitch < -89.0f)
-        pitch = -89.0f;
+    camera.processMouseMovement(xoffset, yoffset);
 }
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-    cameraDistance -= (float)yoffset;
-    if (cameraDistance < 8.0f)
-        cameraDistance = 8.0f;
-    if (cameraDistance > 15.0f)
-        cameraDistance = 15.0f;
+    camera.processMouseScroll(static_cast<float>(yoffset));
 }
 
 // Add this struct at the top, after includes
@@ -477,7 +464,8 @@ int main()
         bool moveRight = glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS;
         bool jump = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
 
-        player.processInput(deltaTime, moveForward, moveBackward, moveLeft, moveRight, jump, yaw);
+        player.processInput(deltaTime, moveForward, moveBackward, moveLeft, moveRight, jump,
+                            camera.getYaw());
         player.update(deltaTime, 0);
         grassManager.update(deltaTime, glm::vec3(1.f, 0.f, 0.5f));
 
@@ -498,22 +486,22 @@ int main()
         // Rotate the player model to face the camera's forward direction
         // The camera's forward direction is determined by the yaw angle
         float playerRotationY =
-            -yaw + 90.0f; // Invert yaw and add 90 degrees to align with camera forward
+            -camera.getYaw() + 90.0f; // Invert yaw and add 90 degrees to align with camera forward
         modelMat =
             glm::rotate(modelMat, glm::radians(playerRotationY), glm::vec3(0.0f, 1.0f, 0.0f));
 
         // Calculate camera position based on mouse angles
         glm::vec3 playerPos = player.getPosition();
-        glm::vec3 camPos;
+        //glm::vec3 camPos;
 
         // Calculate camera offset based on yaw and pitch
-        float horizontalDistance = cameraDistance * cos(glm::radians(pitch));
-        float verticalOffset = cameraDistance * sin(glm::radians(pitch));
+        // float horizontalDistance = cameraDistance * cos(glm::radians(pitch));
+        // float verticalOffset = cameraDistance * sin(glm::radians(pitch));
 
         // Calculate camera position
-        camPos.x = playerPos.x - horizontalDistance * cos(glm::radians(yaw));
-        camPos.y = playerPos.y + cameraHeight + verticalOffset;
-        camPos.z = playerPos.z - horizontalDistance * sin(glm::radians(yaw));
+        // camPos.x = playerPos.x - horizontalDistance * cos(glm::radians(yaw));
+        // camPos.y = playerPos.y + cameraHeight + verticalOffset;
+        // camPos.z = playerPos.z - horizontalDistance * sin(glm::radians(yaw));
 
         // If camera is below terrain, move it closer to the player until it's above
         float minCameraHeight = 0.5f; // Minimum height above terrain
@@ -533,7 +521,9 @@ int main()
         //     }
         // }
 
-        glm::mat4 view = glm::lookAt(camPos, playerPos, glm::vec3(0.0f, 1.0f, 0.0f));
+        camera.updatePosition(player.getPosition());
+
+        glm::mat4 view = camera.getViewMatrix();
         glm::mat4 projection =
             glm::perspective(glm::radians(60.0f), (float)SCR_WIDTH / SCR_HEIGHT, 0.1f, 100.0f);
 
@@ -541,7 +531,7 @@ int main()
         CameraBufferObject camubo;
         camubo.view = view;
         camubo.proj = projection;
-        camubo.position = camPos;
+        camubo.position = camera.getPosition();
         glBindBuffer(GL_UNIFORM_BUFFER, camera_ubo);
         glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(CameraBufferObject), &camubo);
 
@@ -562,7 +552,7 @@ int main()
 
         shader.setInt("texture1", 0);
 
-        grassManager.render(view, projection, camPos);
+        grassManager.render(view, projection, camera.getPosition());
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
