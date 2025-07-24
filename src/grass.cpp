@@ -112,15 +112,19 @@ void GrassManager::update(float deltaTime, const glm::vec3& windDirection)
 void GrassManager::render(const glm::mat4& view, const glm::mat4& projection,
                           const glm::vec3& viewPos)
 {
+    // Cull grass
+    auto planes = camera.GetFrustumPlanes();
+    CullGrassBlades(planes);
+
+    // Only upload visible grass
+    glBindBuffer(GL_ARRAY_BUFFER, m_instanceVBO);
+    glBufferData(GL_ARRAY_BUFFER, visibleBlades.size() * sizeof(GrassBlade), visibleBlades.data(),
+                 GL_DYNAMIC_DRAW);
+
+    // Render instances
     m_grassShader.use();
     m_grassShader.setMat4("view", view);
     m_grassShader.setMat4("projection", projection);
-    m_grassShader.setVec3("viewPos", viewPos);
-    m_grassShader.setFloat("time", m_time);
-    m_grassShader.setVec3("windDirection", m_windDirection);
-    m_grassShader.setFloat("windStrength", m_windStrength);
-
     glBindVertexArray(m_VAO);
-    glDrawArraysInstanced(GL_TRIANGLES, 0, 3, m_grassBlades.size());
-    glBindVertexArray(0);
+    glDrawArraysInstanced(GL_TRIANGLES, 0, 3, visibleBlades.size());
 }

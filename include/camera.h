@@ -8,6 +8,12 @@
 class Camera
 {
 public:
+    struct FrustumPlane
+    {
+        glm::vec3 normal;
+        float distance;
+    };
+
     enum class Movement
     {
         FOREWARD,
@@ -22,7 +28,9 @@ public:
     void processMouseScroll(float yoffset);
     void updatePosition(glm::vec3 newTarget);
 
+    std::array<FrustumPlane, 6> Camera::getFrustumPlanes() const;
     glm::mat4 getViewMatrix() const;
+    glm::mat4 getProjectionMatrix(float aspectRatio, float near = 0.1f, float far = 100.0f) const;
     glm::vec3 getPosition() const;
     float getYaw() const { return yaw; }
 

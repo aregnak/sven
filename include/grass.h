@@ -45,4 +45,36 @@ private:
     const std::vector<float> m_bladeVertices = { -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
                                                  0.5f,  0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
                                                  0.0f,  1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f };
+
+    // Culling methods
+    bool IsBladeVisible(const glm::vec3& position, float height,
+                        const std::array<Camera::FrustumPlane, 6>& planes)
+    {
+        // Test against all 6 frustum planes with blade height compensation
+        for (const auto& plane : planes)
+        {
+            // Expand test point to account for blade height
+            if (glm::dot(plane.normal, position) + plane.distance < -height * 0.5f)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    void CullGrassBlades(const std::array<Camera::FrustumPlane, 6>& planes)
+    {
+        visibleBlades.clear();
+        visibleBlades.reserve(grassBlades.size()); // Avoid reallocations
+
+        for (const auto& blade : grassBlades)
+        {
+            if (IsBladeVisible(blade.position, blade.height, planes))
+            {
+                visibleBlades.push_back(blade);
+            }
+        }
+    }
+
+    std::vector<GrassBlade> visibleBlades; // New container for culled blades
 };
