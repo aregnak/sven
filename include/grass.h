@@ -1,24 +1,48 @@
 #pragma once
 
+#include <vector>
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
 #include "shader.h"
 
-#include <chrono>
-
-class Grass
+struct GrassBlade
 {
-    unsigned int grass_vao_ = 0;
-    ShaderProgram grass_shader_{};
-    ShaderProgram grass_compute_shader_{};
-    GLuint blades_count_ = 0;
+    glm::vec3 position;
+    float width;
+    float height;
+    glm::vec3 color;
+    float rotation;
+};
 
+class GrassManager
+{
 public:
-    // Wind parameters
-    float wind_magnitude = 1.0;
-    float wind_wave_length = 1.0;
-    float wind_wave_period = 1.0;
-    bool computeDispatched_ = false;
+    GrassManager();
+    ~GrassManager();
 
-    void init();
-    void update(float delta_time);
-    void render();
+    void initialize(int numBlades, float areaWidth, float areaDepth);
+    void update(float deltaTime, const glm::vec3& windDirection);
+    void render(const glm::mat4& view, const glm::mat4& projection, const glm::vec3& viewPos);
+
+    void setWindStrength(float strength) { m_windStrength = strength; }
+
+private:
+    void generateGrassBlades(int numBlades, float areaWidth, float areaDepth);
+    void setupBuffers();
+
+    std::vector<GrassBlade> m_grassBlades;
+    Shader m_grassShader;
+
+    GLuint m_VAO;
+    GLuint m_VBO;
+    GLuint m_instanceVBO;
+
+    float m_windStrength;
+    float m_time;
+    glm::vec3 m_windDirection;
+
+    const std::vector<float> m_bladeVertices = { -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+                                                 0.5f,  0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
+                                                 0.0f,  1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f };
 };

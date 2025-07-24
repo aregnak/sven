@@ -27,10 +27,6 @@
 #include "player.h"
 #include "grass.h"
 
-// Forward declarations
-class GrassManager;
-class GrassManagerGeom;
-
 // Global variables
 const int SCR_WIDTH = 1280;
 const int SCR_HEIGHT = 720;
@@ -44,412 +40,12 @@ bool firstMouse = true;
 float cameraDistance = 10.0f;
 float cameraHeight = 2.0f;
 
-// Grass system
-GrassManager* grassManager = nullptr;
-GrassManagerGeom* grassManagerGeom = nullptr;
-
-// Terrain generation functions
-struct TerrainVertex
-{
-    glm::vec3 position;
-    glm::vec2 texCoord;
-};
-
-// Grass blade structure
-struct GrassBlade
-{
-    glm::vec3 position;
-    float height;
-    float width;
-    float rotation;
-    float bend;
-};
-
-// Grass vertex structure
-struct GrassVertex
-{
-    glm::vec3 position;
-    glm::vec2 texCoord;
-    glm::vec3 normal;
-};
-
-// Grass Manager Class (similar to the reference)
-class GrassManager
-{
-private:
-    std::vector<glm::mat4> grassMatrices;
-    std::vector<GrassVertex> grassVertices;
-    std::vector<unsigned int> grassIndices;
-
-    GLuint grassVAO, grassVBO, grassEBO;
-    GLuint grassMatrixVBO; // For instanced matrix data
-    GLuint grassTexture;
-    Shader* grassShader;
-
-    glm::mat4 viewMatrix;
-    glm::mat4 projectionMatrix;
-    glm::vec3 cameraPosition;
-
-    // Terrain reference for height sampling
-    std::vector<TerrainVertex>* terrainVertices;
-    int terrainWidth, terrainHeight;
-    float terrainScale;
-
-    // Instanced rendering parameters
-    const int nbGrassElemSide = 900; // Larger grid to cover whole terrain
-    const float sizeToDraw = 100.0f; // Match actual terrain size (1000x1000 units)
-    uint nbGrassToDraw;
-
-public:
-    GrassManager()
-        : grassShader(nullptr)
-        , terrainVertices(nullptr)
-        , nbGrassToDraw(0)
-    {
-    }
-
-    void init(std::vector<TerrainVertex>* terrain, int width, int height, float scale)
-    {
-        terrainVertices = terrain;
-        terrainWidth = width;
-        terrainHeight = height;
-        terrainScale = scale;
-
-        // Create shader for grass
-        grassShader = new Shader("shaders/grass_vertex.glsl", "shaders/fragment.glsl");
-
-        generateGrassMatrices();
-        createGrassGeometry();
-        createGrassTexture();
-        setupInstancedBuffers();
-
-        std::cout << "GrassManager initialized with " << nbGrassToDraw << " blades" << std::endl;
-    }
-
-    void setViewMatrix(const glm::mat4& view) { viewMatrix = view; }
-    void setProjectionMatrix(const glm::mat4& proj) { projectionMatrix = proj; }
-    void setCameraPosition(const glm::vec3& pos) { cameraPosition = pos; }
-
-    void draw()
-    {
-        if (!grassShader)
-            return;
-
-        grassShader->use();
-
-        // Bind texture
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, grassTexture);
-        grassShader->setInt("texture1", 0);
-
-        // Set matrices
-        grassShader->setMat4("view", viewMatrix);
-        grassShader->setMat4("projection", projectionMatrix);
-
-        // Enable alpha blending
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDisable(GL_CULL_FACE);
-
-        glBindVertexArray(grassVAO);
-
-        // Draw all grass blades (efficient smaller area)
-        glDrawElementsInstanced(GL_TRIANGLES, grassIndices.size(), GL_UNSIGNED_INT, 0,
-                                nbGrassToDraw);
-
-        glBindVertexArray(0);
-        glEnable(GL_CULL_FACE);
-        glDisable(GL_BLEND);
-    }
-
-    void cleanup()
-    {
-        glDeleteVertexArrays(1, &grassVAO);
-        glDeleteBuffers(1, &grassVBO);
-        glDeleteBuffers(1, &grassEBO);
-        glDeleteBuffers(1, &grassMatrixVBO);
-        glDeleteTextures(1, &grassTexture);
-
-        if (grassShader)
-        {
-            delete grassShader;
-            grassShader = nullptr;
-        }
-    }
-
-    float getTerrainHeight(float worldX, float worldZ)
-    {
-        if (!terrainVertices)
-            return 0.0f;
-
-        // Account for terrain offset (terrain is translated by -50, 0, -50)
-        float adjustedX = worldX + 50.0f;
-        float adjustedZ = worldZ + 50.0f;
-
-        // Convert to grid coordinates
-        float gridX = adjustedX / terrainScale;
-        float gridZ = adjustedZ / terrainScale;
-
-        int x0 = (int)gridX;
-        int z0 = (int)gridZ;
-        int x1 = x0 + 1;
-        int z1 = z0 + 1;
-
-        // Clamp to terrain bounds
-        x0 = std::max(0, std::min(terrainWidth - 1, x0));
-        x1 = std::max(0, std::min(terrainWidth - 1, x1));
-        z0 = std::max(0, std::min(terrainHeight - 1, z0));
-        z1 = std::max(0, std::min(terrainHeight - 1, z1));
-
-        // Get the four corner heights
-        float h00 = (*terrainVertices)[z0 * terrainWidth + x0].position.y;
-        float h10 = (*terrainVertices)[z0 * terrainWidth + x1].position.y;
-        float h01 = (*terrainVertices)[z1 * terrainWidth + x0].position.y;
-        float h11 = (*terrainVertices)[z1 * terrainWidth + x1].position.y;
-
-        // Calculate interpolation weights
-        float fx = gridX - x0;
-        float fz = gridZ - z0;
-
-        // Bilinear interpolation
-        float h0 = h00 * (1 - fx) + h10 * fx;
-        float h1 = h01 * (1 - fx) + h11 * fx;
-        return h0 * (1 - fz) + h1 * fz;
-    }
-
-private:
-    void generateGrassMatrices()
-    {
-        grassMatrices.clear();
-
-        // Initialize random seed
-        srand(time(0));
-
-        // Generate grass matrices in a grid pattern like the reference
-        float terrainMinX = -200.f;
-        float terrainMaxX = 200.f;
-        float terrainMinZ = -200.f;
-        float terrainMaxZ = 200.0f;
-
-        // float terrainMinX = std::numeric_limits<float>::max();
-        // float terrainMaxX = std::numeric_limits<float>::lowest();
-        // float terrainMinZ = std::numeric_limits<float>::max();
-        // float terrainMaxZ = std::numeric_limits<float>::lowest();
-        // for (const auto& v : *terrainVertices)
-        // {
-        //     terrainMinX = std::min(terrainMinX, v.position.x);
-        //     terrainMaxX = std::max(terrainMaxX, v.position.x);
-        //     terrainMinZ = std::min(terrainMinZ, v.position.z);
-        //     terrainMaxZ = std::max(terrainMaxZ, v.position.z);
-        // }
-
-        for (int i = 0; i < nbGrassElemSide; i++)
-        {
-            for (int j = 0; j < nbGrassElemSide; j++)
-            {
-                float posX =
-                    terrainMinX + (terrainMaxX - terrainMinX) * (float(i) / (nbGrassElemSide - 1));
-                float posZ =
-                    terrainMinZ + (terrainMaxZ - terrainMinZ) * (float(j) / (nbGrassElemSide - 1));
-
-                // Add small random offset
-                int valRand = rand() % 1000;
-                float fRand = float(valRand) / 1000.0f;
-                posX += fRand / 10.0f - 0.05f;
-                posZ += fRand / 10.0f - 0.05f;
-
-                // Get terrain height at this position
-                float terrainHeight = getTerrainHeight(posX, posZ);
-
-                // Skip if terrain is too low or steep
-                if (terrainHeight < -10.0f)
-                    continue;
-
-                float slope = calculateSlope(posX, posZ);
-                if (slope > 1.5f)
-                    continue;
-
-                // Create transformation matrix
-                glm::mat4 modelMatrix = glm::mat4(1.0f);
-
-                // Position on terrain (grass blade base should be at terrain height)
-                modelMatrix = glm::translate(modelMatrix, glm::vec3(posX, terrainHeight, posZ));
-
-                // Random rotation around Y axis
-                modelMatrix =
-                    glm::rotate(modelMatrix, posX * posZ * 5.244f, glm::vec3(0.0f, 1.0f, 0.0f));
-
-                // Scale (similar to reference) ter
-                modelMatrix = glm::scale(modelMatrix, glm::vec3(0.3f, 1.0f, 0.3f));
-                modelMatrix = glm::scale(modelMatrix, glm::vec3(1.0f, 1.0f + fRand, 1.0f));
-
-                grassMatrices.push_back(modelMatrix);
-            }
-        }
-
-        nbGrassToDraw = grassMatrices.size();
-    }
-
-    float calculateSlope(float worldX, float worldZ)
-    {
-        // Calculate slope by sampling nearby points
-        float delta = terrainScale * 0.5f;
-
-        float height = getTerrainHeight(worldX, worldZ);
-        float left = getTerrainHeight(worldX - delta, worldZ);
-        float right = getTerrainHeight(worldX + delta, worldZ);
-        float up = getTerrainHeight(worldX, worldZ - delta);
-        float down = getTerrainHeight(worldX, worldZ + delta);
-
-        float dx = (right - left) / (2.0f * delta);
-        float dz = (down - up) / (2.0f * delta);
-
-        return sqrt(dx * dx + dz * dz);
-    }
-
-    void createGrassGeometry()
-    {
-        grassVertices.clear();
-        grassIndices.clear();
-
-        // Create grass blade quad
-        grassVertices.push_back(
-            { glm::vec3(-0.5f, 0.0f, 0.0f), glm::vec2(0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f) });
-        grassVertices.push_back(
-            { glm::vec3(0.5f, 0.0f, 0.0f), glm::vec2(1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f) });
-        grassVertices.push_back(
-            { glm::vec3(-0.5f, 1.0f, 0.0f), glm::vec2(0.0f, 1.0f), glm::vec3(0.0f, 0.0f, 1.0f) });
-        grassVertices.push_back(
-            { glm::vec3(0.5f, 1.0f, 0.0f), glm::vec2(1.0f, 1.0f), glm::vec3(0.0f, 0.0f, 1.0f) });
-
-        grassIndices = { 0, 1, 2, 1, 3 };
-    }
-
-    void createGrassTexture()
-    {
-        const int texSize = 64;
-        std::vector<unsigned char> textureData(texSize * texSize * 4);
-
-        for (int y = 0; y < texSize; ++y)
-        {
-            for (int x = 0; x < texSize; ++x)
-            {
-                int index = (y * texSize + x) * 4;
-                float gradient = (float)y / texSize;
-                float noise = ((float)rand() / RAND_MAX - 0.5f) * 0.2f;
-                gradient += noise;
-                gradient = std::max(0.0f, std::min(1.0f, gradient));
-
-                unsigned char green = 50 + (unsigned char)(gradient * 150);
-                unsigned char red = 20 + (unsigned char)(gradient * 40);
-                unsigned char blue = 10 + (unsigned char)(gradient * 20);
-
-                unsigned char alpha = 255;
-                if (x < 5 || x > texSize - 5)
-                    alpha =
-                        (unsigned char)(255 * (1.0f - abs(x - texSize / 2.0f) / (texSize / 2.0f)));
-
-                textureData[index] = red;
-                textureData[index + 1] = green;
-                textureData[index + 2] = blue;
-                textureData[index + 3] = alpha;
-            }
-        }
-
-        glGenTextures(1, &grassTexture);
-        glBindTexture(GL_TEXTURE_2D, grassTexture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texSize, texSize, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                     textureData.data());
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    }
-
-    void setupInstancedBuffers()
-    {
-        glGenVertexArrays(1, &grassVAO);
-        glGenBuffers(1, &grassVBO);
-        glGenBuffers(1, &grassEBO);
-        glGenBuffers(1, &grassMatrixVBO);
-
-        glBindVertexArray(grassVAO);
-
-        // Setup vertex data
-        glBindBuffer(GL_ARRAY_BUFFER, grassVBO);
-        glBufferData(GL_ARRAY_BUFFER, grassVertices.size() * sizeof(GrassVertex),
-                     grassVertices.data(), GL_STATIC_DRAW);
-
-        // Position attribute
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(GrassVertex), (void*)0);
-        glEnableVertexAttribArray(0);
-
-        // Texture coordinate attribute
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(GrassVertex),
-                              (void*)offsetof(GrassVertex, texCoord));
-        glEnableVertexAttribArray(1);
-
-        // Normal attribute
-        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(GrassVertex),
-                              (void*)offsetof(GrassVertex, normal));
-        glEnableVertexAttribArray(2);
-
-        // Setup indices
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, grassEBO);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, grassIndices.size() * sizeof(unsigned int),
-                     grassIndices.data(), GL_STATIC_DRAW);
-
-        // Setup instanced matrix data
-        glBindBuffer(GL_ARRAY_BUFFER, grassMatrixVBO);
-        glBufferData(GL_ARRAY_BUFFER, grassMatrices.size() * sizeof(glm::mat4),
-                     grassMatrices.data(), GL_STATIC_DRAW);
-
-        // Set up matrix attributes for instancing (4 vec4s per matrix)
-        uint32_t vec4Size = sizeof(glm::vec4);
-
-        // Matrix column 0
-        glEnableVertexAttribArray(3);
-        glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4 * vec4Size, (void*)0);
-        glVertexAttribDivisor(3, 1);
-
-        // Matrix column 1
-        glEnableVertexAttribArray(4);
-        glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, 4 * vec4Size, (void*)(uintptr_t)(vec4Size));
-        glVertexAttribDivisor(4, 1);
-
-        // Matrix column 2
-        glEnableVertexAttribArray(5);
-        glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, 4 * vec4Size,
-                              (void*)(uintptr_t)(2 * vec4Size));
-        glVertexAttribDivisor(5, 1);
-
-        // Matrix column 3
-        glEnableVertexAttribArray(6);
-        glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, 4 * vec4Size,
-                              (void*)(uintptr_t)(3 * vec4Size));
-        glVertexAttribDivisor(6, 1);
-
-        glBindVertexArray(0);
-    }
-};
-
-// Geometry shader version (placeholder for future implementation)
-class GrassManagerGeom
-{
-public:
-    void init(std::vector<TerrainVertex>* terrain, int width, int height, float scale)
-    {
-        // TODO: Implement geometry shader version
-        std::cout << "GrassManagerGeom initialized (placeholder)" << std::endl;
-    }
-
-    void setViewMatrix(const glm::mat4& view) {}
-    void setProjectionMatrix(const glm::mat4& proj) {}
-    void setCameraPosition(const glm::vec3& pos) {}
-
-    void draw() {}
-    void cleanup() {}
-};
+// // Terrain generation functions
+// struct TerrainVertex
+// {
+//     glm::vec3 position;
+//     glm::vec2 texCoord;
+// };
 
 // Helper function to extract transformation from a glTF node
 glm::mat4 getNodeTransform(const tinygltf::Node& node)
@@ -607,93 +203,93 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
         cameraDistance = 15.0f;
 }
 
-std::vector<TerrainVertex> generateTerrainVertices(int width, int height, float scale)
-{
-    std::vector<TerrainVertex> vertices;
+// std::vector<TerrainVertex> generateTerrainVertices(int width, int height, float scale)
+// {
+//     std::vector<TerrainVertex> vertices;
 
-    // Create multiple noise layers for more interesting terrain
-    FastNoiseLite baseNoise;
-    baseNoise.SetSeed(1337);
-    baseNoise.SetNoiseType(FastNoiseLite::NoiseType_Perlin);
-    baseNoise.SetFrequency(0.02f);
-    baseNoise.SetFractalType(FastNoiseLite::FractalType_FBm);
-    baseNoise.SetFractalOctaves(5);
-    baseNoise.SetFractalLacunarity(2.0f);
-    baseNoise.SetFractalGain(0.5f);
+//     // Create multiple noise layers for more interesting terrain
+//     FastNoiseLite baseNoise;
+//     baseNoise.SetSeed(1337);
+//     baseNoise.SetNoiseType(FastNoiseLite::NoiseType_Perlin);
+//     baseNoise.SetFrequency(0.02f);
+//     baseNoise.SetFractalType(FastNoiseLite::FractalType_FBm);
+//     baseNoise.SetFractalOctaves(5);
+//     baseNoise.SetFractalLacunarity(2.0f);
+//     baseNoise.SetFractalGain(0.5f);
 
-    // Create detail noise for small features
-    FastNoiseLite detailNoise;
-    detailNoise.SetSeed(42);
-    detailNoise.SetNoiseType(FastNoiseLite::NoiseType_Perlin);
-    detailNoise.SetFrequency(0.1f);
-    detailNoise.SetFractalType(FastNoiseLite::FractalType_FBm);
-    detailNoise.SetFractalOctaves(3);
-    detailNoise.SetFractalLacunarity(2.0f);
-    detailNoise.SetFractalGain(0.5f);
+//     // Create detail noise for small features
+//     FastNoiseLite detailNoise;
+//     detailNoise.SetSeed(42);
+//     detailNoise.SetNoiseType(FastNoiseLite::NoiseType_Perlin);
+//     detailNoise.SetFrequency(0.1f);
+//     detailNoise.SetFractalType(FastNoiseLite::FractalType_FBm);
+//     detailNoise.SetFractalOctaves(3);
+//     detailNoise.SetFractalLacunarity(2.0f);
+//     detailNoise.SetFractalGain(0.5f);
 
-    for (int z = 0; z < height; ++z)
-    {
-        for (int x = 0; x < width; ++x)
-        {
-            // Generate height using multiple noise layers
-            float worldX = x * scale;
-            float worldZ = z * scale;
+//     for (int z = 0; z < height; ++z)
+//     {
+//         for (int x = 0; x < width; ++x)
+//         {
+//             // Generate height using multiple noise layers
+//             float worldX = x * scale;
+//             float worldZ = z * scale;
 
-            // Base terrain
-            float baseHeight = baseNoise.GetNoise(worldX, worldZ);
+//             // Base terrain
+//             float baseHeight = baseNoise.GetNoise(worldX, worldZ);
 
-            // Detail terrain
-            float detailHeight = detailNoise.GetNoise(worldX, worldZ) * 0.3f;
+//             // Detail terrain
+//             float detailHeight = detailNoise.GetNoise(worldX, worldZ) * 0.3f;
 
-            // Combine noise layers
-            float heightValue = (baseHeight + detailHeight) * 15.0f;
+//             // Combine noise layers
+//             float heightValue = (baseHeight + detailHeight) * 15.0f;
 
-            // Add some valleys and peaks
-            float distanceFromCenter = sqrt(worldX * worldX + worldZ * worldZ);
-            float centerFalloff = 1.0f - (distanceFromCenter / 100.0f);
-            if (centerFalloff > 0)
-            {
-                heightValue += centerFalloff * 5.0f;
-            }
+//             // Add some valleys and peaks
+//             float distanceFromCenter = sqrt(worldX * worldX + worldZ * worldZ);
+//             float centerFalloff = 1.0f - (distanceFromCenter / 100.0f);
+//             if (centerFalloff > 0)
+//             {
+//                 heightValue += centerFalloff * 5.0f;
+//             }
 
-            // Create vertex
-            TerrainVertex vertex;
-            vertex.position = glm::vec3(worldX, heightValue, worldZ);
-            vertex.texCoord = glm::vec2((float)x / (width - 1), (float)z / (height - 1));
-            vertices.push_back(vertex);
-        }
-    }
+//             // Create vertex
+//             TerrainVertex vertex;
+//             vertex.position = glm::vec3(worldX, heightValue, worldZ);
+//             vertex.texCoord = glm::vec2((float)x / (width - 1), (float)z / (height - 1));
+//             vertices.push_back(vertex);
+//         }
+//     }
 
-    return vertices;
-}
+//     return vertices;
+// }
 
-std::vector<unsigned int> generateTerrainIndices(int width, int height)
-{
-    std::vector<unsigned int> indices;
+// std::vector<unsigned int> generateTerrainIndices(int width, int height)
+// {
+//     std::vector<unsigned int> indices;
 
-    for (int z = 0; z < height - 1; ++z)
-    {
-        for (int x = 0; x < width - 1; ++x)
-        {
-            unsigned int topLeft = z * width + x;
-            unsigned int topRight = topLeft + 1;
-            unsigned int bottomLeft = (z + 1) * width + x;
-            unsigned int bottomRight = bottomLeft + 1;
+//     for (int z = 0; z < height - 1; ++z)
+//     {
+//         for (int x = 0; x < width - 1; ++x)
+//         {
+//             unsigned int topLeft = z * width + x;
+//             unsigned int topRight = topLeft + 1;
+//             unsigned int bottomLeft = (z + 1) * width + x;
+//             unsigned int bottomRight = bottomLeft + 1;
 
-            // First triangle
-            indices.push_back(topLeft);
-            indices.push_back(bottomLeft);
-            indices.push_back(topRight);
+//             // First triangle
+//             indices.push_back(topLeft);
+//             indices.push_back(bottomLeft);
+//             indices.push_back(topRight);
 
-            // Second triangle
-            indices.push_back(topRight);
-            indices.push_back(bottomLeft);
-            indices.push_back(bottomRight);
-        }
-    }
+//             // Second triangle
+//             indices.push_back(topRight);
+//             indices.push_back(bottomLeft);
+//             indices.push_back(bottomRight);
+//         }
+//     }
 
-    return indices;
-}
+//     return indices;
+// }
 
 // Add this struct at the top, after includes
 struct CameraBufferObject
@@ -703,6 +299,10 @@ struct CameraBufferObject
     glm::vec3 position;
     float _pad = 0.0f; // Padding to align to 16 bytes
 };
+
+// int terrainWidth = 100;
+// int terrainHeight = 100;
+// float terrainScale = 10.0f;
 
 int main()
 {
@@ -797,31 +397,13 @@ int main()
             { // This node has a mesh
                 glm::mat4 completeTransform = buildNodeTransform(model, nodeIndex, nodeTransforms);
                 meshTransforms[node.mesh] = completeTransform;
-                //std::cout << "Mesh " << node.mesh << " transform: " << std::endl;
-                // for (int i = 0; i < 4; ++i)
-                // {
-                //     for (int j = 0; j < 4; ++j)
-                //     {
-                //         std::cout << completeTransform[i][j] << " ";
-                //     }
-                //     std::cout << std::endl;
-                // }
             }
         }
     }
 
-    // std::cout << "Total meshes: " << model.meshes.size() << std::endl;
-    // std::cout << "Total nodes: " << model.nodes.size() << std::endl;
-    // std::cout << "Total scenes: " << model.scenes.size() << std::endl;
-
     if (!model.scenes.empty())
     {
         const auto& defaultScene = model.scenes[model.defaultScene >= 0 ? model.defaultScene : 0];
-        // std::cout << "Default scene nodes: " << defaultScene.nodes.size() << std::endl;
-        // for (int nodeIndex : defaultScene.nodes)
-        // {
-        //     std::cout << "Scene node: " << nodeIndex << std::endl;
-        // }
     }
 
     for (size_t meshIndex = 0; meshIndex < model.meshes.size(); ++meshIndex)
@@ -952,40 +534,40 @@ int main()
     }
 
     // Generate terrain
-    int terrainWidth = 100;
-    int terrainHeight = 100;
-    float terrainScale = 10.0f;
+    // int terrainWidth = 100;
+    // int terrainHeight = 100;
+    // float terrainScale = 10.0f;
 
-    std::vector<TerrainVertex> terrainVertices =
-        generateTerrainVertices(terrainWidth, terrainHeight, terrainScale);
-    std::vector<unsigned int> terrainIndices = generateTerrainIndices(terrainWidth, terrainHeight);
+    // std::vector<TerrainVertex> terrainVertices =
+    //     generateTerrainVertices(terrainWidth, terrainHeight, terrainScale);
+    // std::vector<unsigned int> terrainIndices = generateTerrainIndices(terrainWidth, terrainHeight);
 
     // Create terrain VAO and VBO
-    GLuint terrainVAO, terrainVBO, terrainEBO;
-    glGenVertexArrays(1, &terrainVAO);
-    glGenBuffers(1, &terrainVBO);
-    glGenBuffers(1, &terrainEBO);
+    // GLuint terrainVAO, terrainVBO, terrainEBO;
+    // glGenVertexArrays(1, &terrainVAO);
+    // glGenBuffers(1, &terrainVBO);
+    // glGenBuffers(1, &terrainEBO);
 
-    glBindVertexArray(terrainVAO);
+    // glBindVertexArray(terrainVAO);
 
-    glBindBuffer(GL_ARRAY_BUFFER, terrainVBO);
-    glBufferData(GL_ARRAY_BUFFER, terrainVertices.size() * sizeof(TerrainVertex),
-                 terrainVertices.data(), GL_STATIC_DRAW);
+    // glBindBuffer(GL_ARRAY_BUFFER, terrainVBO);
+    // glBufferData(GL_ARRAY_BUFFER, terrainVertices.size() * sizeof(TerrainVertex),
+    //              terrainVertices.data(), GL_STATIC_DRAW);
 
-    // Position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(TerrainVertex), (void*)0);
-    glEnableVertexAttribArray(0);
+    // // Position attribute
+    // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(TerrainVertex), (void*)0);
+    // glEnableVertexAttribArray(0);
 
-    // Texture coordinate attribute
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(TerrainVertex),
-                          (void*)offsetof(TerrainVertex, texCoord));
-    glEnableVertexAttribArray(1);
+    // // Texture coordinate attribute
+    // glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(TerrainVertex),
+    //                       (void*)offsetof(TerrainVertex, texCoord));
+    // glEnableVertexAttribArray(1);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, terrainEBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, terrainIndices.size() * sizeof(unsigned int),
-                 terrainIndices.data(), GL_STATIC_DRAW);
+    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, terrainEBO);
+    // glBufferData(GL_ELEMENT_ARRAY_BUFFER, terrainIndices.size() * sizeof(unsigned int),
+    //              terrainIndices.data(), GL_STATIC_DRAW);
 
-    glBindVertexArray(0);
+    // glBindVertexArray(0);
 
     // Create a procedural terrain texture
     GLuint grassTexture;
@@ -1030,17 +612,6 @@ int main()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glGenerateMipmap(GL_TEXTURE_2D);
 
-    // Initialize grass manager
-    grassManager = new GrassManager();
-    grassManager->init(&terrainVertices, terrainWidth, terrainHeight, terrainScale);
-
-    // Initialize geometry shader version (placeholder)
-    grassManagerGeom = new GrassManagerGeom();
-    grassManagerGeom->init(&terrainVertices, terrainWidth, terrainHeight, terrainScale);
-
-    // float rotationX = 0.0f;
-    // float rotationY = 0.0f;
-
     float deltaTime = 0.f;
     float lastFrame = 0.f;
 
@@ -1049,16 +620,15 @@ int main()
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
-    // Grass grass;
-
-    // grass.init();
-
     // Camera UBO for compute shader
     GLuint camera_ubo;
     glGenBuffers(1, &camera_ubo);
     glBindBuffer(GL_UNIFORM_BUFFER, camera_ubo);
     glBufferData(GL_UNIFORM_BUFFER, sizeof(CameraBufferObject), nullptr, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, camera_ubo); // Bind to binding = 0
+
+    GrassManager grassManager;
+    grassManager.initialize(10000, 20.f, 20.f);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -1084,8 +654,8 @@ int main()
         bool jump = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
 
         player.processInput(deltaTime, moveForward, moveBackward, moveLeft, moveRight, jump, yaw);
-        player.update(deltaTime, grassManager->getTerrainHeight(player.getPosition().x,
-                                                                player.getPosition().z));
+        player.update(deltaTime, 0);
+        grassManager.update(deltaTime, glm::vec3(1.f, 0.f, 0.5f));
 
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1123,21 +693,21 @@ int main()
 
         // If camera is below terrain, move it closer to the player until it's above
         float minCameraHeight = 0.5f; // Minimum height above terrain
-        float terrainY = grassManager->getTerrainHeight(camPos.x, camPos.z);
+        // float terrainY = grassManager->getTerrainHeight(camPos.x, camPos.z);
 
         // If camera is below terrain, move it closer to the player until it's above
-        if (camPos.y < terrainY + minCameraHeight)
-        {
-            glm::vec3 toPlayer = glm::normalize(playerPos - camPos);
-            float step = 0.1f; // How much to move per iteration (tune as needed)
-            int maxSteps = 100; // Prevent infinite loop
+        // if (camPos.y < terrainY + minCameraHeight)
+        // {
+        //     glm::vec3 toPlayer = glm::normalize(playerPos - camPos);
+        //     float step = 0.1f; // How much to move per iteration (tune as needed)
+        //     int maxSteps = 100; // Prevent infinite loop
 
-            for (int i = 0; i < maxSteps && camPos.y < terrainY + minCameraHeight; ++i)
-            {
-                camPos += toPlayer * step;
-                terrainY = grassManager->getTerrainHeight(camPos.x, camPos.z);
-            }
-        }
+        //     for (int i = 0; i < maxSteps && camPos.y < terrainY + minCameraHeight; ++i)
+        //     {
+        //         camPos += toPlayer * step;
+        //         // terrainY = grassManager->getTerrainHeight(camPos.x, camPos.z);
+        //     }
+        // }
 
         glm::mat4 view = glm::lookAt(camPos, playerPos, glm::vec3(0.0f, 1.0f, 0.0f));
         glm::mat4 projection =
@@ -1168,26 +738,28 @@ int main()
 
         // grass.update(deltaTime);
         // Draw terrain
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, grassTexture);
+        // glActiveTexture(GL_TEXTURE0);
+        // glBindTexture(GL_TEXTURE_2D, grassTexture);
         shader.setInt("texture1", 0);
 
-        glm::mat4 terrainModel = glm::mat4(1.0f);
-        terrainModel =
-            glm::translate(terrainModel, glm::vec3(-50.0f, 0.0f, -50.0f)); // Center the terrain
-        shader.setMat4("model", terrainModel);
+        // glm::mat4 terrainModel = glm::mat4(1.0f);
+        // terrainModel =
+        //     glm::translate(terrainModel, glm::vec3(-50.0f, 0.0f, -50.0f)); // Center the terrain
+        // shader.setMat4("model", terrainModel);
 
-        glBindVertexArray(terrainVAO);
-        glDrawElements(GL_TRIANGLES, terrainIndices.size(), GL_UNSIGNED_INT, 0);
-        glBindVertexArray(0);
+        // glBindVertexArray(terrainVAO);
+        // glDrawElements(GL_TRIANGLES, terrainIndices.size(), GL_UNSIGNED_INT, 0);
+        // glBindVertexArray(0);
 
         // Draw grass using GrassManager
-        grassManager->setCameraPosition(camPos);
-        grassManager->setViewMatrix(view);
-        grassManager->setProjectionMatrix(projection);
-        grassManager->draw();
+        // grassManager->setCameraPosition(camPos);
+        // grassManager->setViewMatrix(view);
+        // grassManager->setProjectionMatrix(projection);
+        // grassManager->draw();
 
         // grass.render();
+
+        grassManager.render(view, projection, camPos);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -1213,22 +785,22 @@ int main()
     }
 
     // Cleanup terrain
-    glDeleteVertexArrays(1, &terrainVAO);
-    glDeleteBuffers(1, &terrainVBO);
-    glDeleteBuffers(1, &terrainEBO);
-    glDeleteTextures(1, &grassTexture);
+    // glDeleteVertexArrays(1, &terrainVAO);
+    // glDeleteBuffers(1, &terrainVBO);
+    // glDeleteBuffers(1, &terrainEBO);
+    // glDeleteTextures(1, &grassTexture);
 
-    // Cleanup grass managers
-    if (grassManager)
-    {
-        grassManager->cleanup();
-        delete grassManager;
-    }
-    if (grassManagerGeom)
-    {
-        grassManagerGeom->cleanup();
-        delete grassManagerGeom;
-    }
+    // // Cleanup grass managers
+    // if (grassManager)
+    // {
+    //     grassManager->cleanup();
+    //     delete grassManager;
+    // }
+    // if (grassManagerGeom)
+    // {
+    //     grassManagerGeom->cleanup();
+    //     delete grassManagerGeom;
+    // }
 
     // Cleanup ImGui
     ImGui_ImplOpenGL3_Shutdown();
