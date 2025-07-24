@@ -310,6 +310,8 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    // MSAAx4
+    glfwWindowHint(GLFW_SAMPLES, 4);
 
     GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "sven", NULL, NULL);
     if (!window)
@@ -347,7 +349,7 @@ int main()
     // Player model
     Player player(glm::vec3(0.0f, 15.0f, 15.0f)); // Start above terrain
 
-    bool ret = loader.LoadBinaryFromFile(&model, &err, &warn, "Assets/Characters/gltf/Mage.glb");
+    bool ret = loader.LoadBinaryFromFile(&model, &err, &warn, "Assets/Characters/gltf/Knight.glb");
 
     if (!warn.empty())
         std::cout << "Warn: " << warn << std::endl;
@@ -628,7 +630,7 @@ int main()
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, camera_ubo); // Bind to binding = 0
 
     GrassManager grassManager;
-    grassManager.initialize(10000, 20.f, 20.f);
+    grassManager.initialize(160000, 100.f, 100.f);
 
     while (!glfwWindowShouldClose(window))
     {
