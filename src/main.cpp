@@ -551,7 +551,12 @@ int main()
         }
 
         shader.setInt("texture1", 0);
-        auto frustumPlanes = camera.getFrustumPlanes((float)SCR_WIDTH / SCR_HEIGHT);
+
+        int width, height;
+        glfwGetFramebufferSize(window, &width, &height);
+        float aspectRatio = static_cast<float>(width) / height;
+
+        auto frustumPlanes = camera.getFrustumPlanes(aspectRatio);
         grassManager.render(view, projection, camera.getPosition(), frustumPlanes);
 
         ImGui::Render();

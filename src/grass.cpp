@@ -113,13 +113,23 @@ void GrassManager::render(const glm::mat4& view, const glm::mat4& projection,
                           const glm::vec3& viewPos,
                           const std::array<Camera::FrustumPlane, 6>& frustumPlanes)
 {
-    // Cull grass
-    CullGrassBlades(frustumPlanes);
+    // Only update if view has changed
+    static glm::mat4 lastView;
+    static glm::vec3 lastPos;
+    glm::vec3 currentPos = glm::vec3(view[3]);
 
-    // Only upload visible grass
-    glBindBuffer(GL_ARRAY_BUFFER, m_instanceVBO);
-    glBufferData(GL_ARRAY_BUFFER, visibleBlades.size() * sizeof(GrassBlade), visibleBlades.data(),
-                 GL_DYNAMIC_DRAW);
+    // Check position change magnitude (more reliable than matrix comparison)
+    if (glm::length(currentPos - lastPos) > 0.1f)
+    {
+        CullGrassBlades(frustumPlanes);
+        lastView = view;
+        lastPos = currentPos;
+
+        // Only upload when culling changes
+        glBindBuffer(GL_ARRAY_BUFFER, m_instanceVBO);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, visibleBlades.size() * sizeof(GrassBlade),
+                        visibleBlades.data());
+    }
 
     // Render instances
     m_grassShader.use();
