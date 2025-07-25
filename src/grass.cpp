@@ -71,9 +71,8 @@ void GrassManager::setupBuffers()
     // Setup instance VBO
     glGenBuffers(1, &m_instanceVBO);
     glBindBuffer(GL_ARRAY_BUFFER, m_instanceVBO);
-    glBufferData(GL_ARRAY_BUFFER, m_grassBlades.size() * sizeof(GrassBlade), &m_grassBlades[0],
-                 GL_STATIC_DRAW);
-
+    glBufferData(GL_ARRAY_BUFFER, m_grassBlades.size() * sizeof(GrassBlade), nullptr,
+                 GL_DYNAMIC_DRAW);
     // Instance attributes
     // Position
     glEnableVertexAttribArray(3);
