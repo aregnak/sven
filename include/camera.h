@@ -4,6 +4,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <GLFW/glfw3.h>
+#include <array>
+#include <vector>
 
 class Camera
 {
@@ -28,7 +30,7 @@ public:
     void processMouseScroll(float yoffset);
     void updatePosition(glm::vec3 newTarget);
 
-    std::array<FrustumPlane, 6> Camera::getFrustumPlanes() const;
+    std::array<FrustumPlane, 6> getFrustumPlanes(float aspectRatio) const;
     glm::mat4 getViewMatrix() const;
     glm::mat4 getProjectionMatrix(float aspectRatio, float near = 0.1f, float far = 100.0f) const;
     glm::vec3 getPosition() const;
@@ -52,6 +54,7 @@ private:
     float pitch;
     float distance;
     float height;
+    float zoom;
 
     // Camera options
     float movementSpeed;

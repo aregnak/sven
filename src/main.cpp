@@ -551,8 +551,8 @@ int main()
         }
 
         shader.setInt("texture1", 0);
-
-        grassManager.render(view, projection, camera.getPosition());
+        auto frustumPlanes = camera.getFrustumPlanes((float)SCR_WIDTH / SCR_HEIGHT);
+        grassManager.render(view, projection, camera.getPosition(), frustumPlanes);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

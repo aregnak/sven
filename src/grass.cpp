@@ -110,11 +110,11 @@ void GrassManager::update(float deltaTime, const glm::vec3& windDirection)
 }
 
 void GrassManager::render(const glm::mat4& view, const glm::mat4& projection,
-                          const glm::vec3& viewPos)
+                          const glm::vec3& viewPos,
+                          const std::array<Camera::FrustumPlane, 6>& frustumPlanes)
 {
     // Cull grass
-    auto planes = camera.GetFrustumPlanes();
-    CullGrassBlades(planes);
+    CullGrassBlades(frustumPlanes);
 
     // Only upload visible grass
     glBindBuffer(GL_ARRAY_BUFFER, m_instanceVBO);

@@ -4,6 +4,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+#include "camera.h"
 #include "shader.h"
 
 struct GrassBlade
@@ -23,7 +24,8 @@ public:
 
     void initialize(int numBlades, float areaWidth, float areaDepth);
     void update(float deltaTime, const glm::vec3& windDirection);
-    void render(const glm::mat4& view, const glm::mat4& projection, const glm::vec3& viewPos);
+    void render(const glm::mat4& view, const glm::mat4& projection, const glm::vec3& viewPos,
+                const std::array<Camera::FrustumPlane, 6>& frustumPlanes);
 
     void setWindStrength(float strength) { m_windStrength = strength; }
 
@@ -65,9 +67,9 @@ private:
     void CullGrassBlades(const std::array<Camera::FrustumPlane, 6>& planes)
     {
         visibleBlades.clear();
-        visibleBlades.reserve(grassBlades.size()); // Avoid reallocations
+        visibleBlades.reserve(m_grassBlades.size()); // Avoid reallocations
 
-        for (const auto& blade : grassBlades)
+        for (const auto& blade : m_grassBlades)
         {
             if (IsBladeVisible(blade.position, blade.height, planes))
             {
