@@ -135,6 +135,11 @@ void GrassManager::render(const glm::mat4& view, const glm::mat4& projection,
     m_grassShader.use();
     m_grassShader.setMat4("view", view);
     m_grassShader.setMat4("projection", projection);
+    m_grassShader.setVec3("viewPos", viewPos);
+    m_grassShader.setFloat("time", m_time);
+    m_grassShader.setVec3("windDirection", m_windDirection);
+    m_grassShader.setFloat("windStrength", m_windStrength);
+
     glBindVertexArray(m_VAO);
     glDrawArraysInstanced(GL_TRIANGLES, 0, 3, visibleBlades.size());
 }
