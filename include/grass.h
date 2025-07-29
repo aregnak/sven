@@ -72,7 +72,7 @@ private:
         for (const auto& blade : m_grassBlades)
         {
             bool visible = true;
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < 6; i++)
             {
                 if (glm::dot(planes[i].normal, blade.position) + planes[i].distance < -blade.height)
                 {
