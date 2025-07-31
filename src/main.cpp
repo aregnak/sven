@@ -192,6 +192,122 @@ struct CameraBufferObject
     float _pad = 0.0f; // Padding to align to 16 bytes
 };
 
+struct AnimSampler
+{
+    std::vector<float> input;
+    std::vector<glm::vec4> output;
+    std::string interpolation;
+};
+
+struct AnimChannel
+{
+    int targetNode;
+    std::string path; // "translation", "rotation", "scale"
+    AnimSampler sampler;
+};
+
+struct Animation
+{
+    std::string name;
+    std::vector<AnimChannel> channels;
+};
+
+std::vector<Animation> animations;
+float animationTime = 0.0f;
+
+template <typename T>
+std::vector<T> readAccessorVec(const tinygltf::Model& model, const tinygltf::Accessor& accessor)
+{
+    const auto& bufferView = model.bufferViews[accessor.bufferView];
+    const auto& buffer = model.buffers[bufferView.buffer];
+    const uint8_t* data = buffer.data.data() + bufferView.byteOffset + accessor.byteOffset;
+
+    std::vector<T> values(accessor.count);
+    memcpy(values.data(), data, accessor.count * sizeof(T));
+    return values;
+}
+
+int findKeyframe(const std::vector<float>& times, float time)
+{
+    for (size_t i = 0; i < times.size() - 1; ++i)
+        if (time >= times[i] && time <= times[i + 1])
+            return i;
+    return 0;
+}
+
+glm::vec4 interpolate(const std::vector<float>& times, const std::vector<glm::vec4>& values,
+                      float time, const std::string& path)
+{
+    if (times.empty())
+        return values[0];
+    if (time <= times.front())
+        return values.front();
+    if (time >= times.back())
+        return values.back();
+
+    int index = findKeyframe(times, time);
+    float t0 = times[index];
+    float t1 = times[index + 1];
+    float alpha = (time - t0) / (t1 - t0);
+
+    const glm::vec4& v0 = values[index];
+    const glm::vec4& v1 = values[index + 1];
+
+    if (path == "rotation")
+    {
+        return glm::mix(v0, v1, alpha); // vec4, assumes w is last
+    }
+    else
+    {
+        return glm::mix(v0, v1, alpha);
+    }
+}
+
+void updateAnimation(float deltaTime, tinygltf::Model& model, std::vector<glm::mat4>& nodeMatrices,
+                     std::map<int, glm::mat4> meshTransforms)
+{
+    if (animations.empty())
+        return;
+
+    animationTime += deltaTime;
+
+    Animation& anim = animations[0]; // just play the first animation for now
+
+    for (const auto& channel : anim.channels)
+    {
+        int nodeIndex = channel.targetNode;
+        const auto& sampler = channel.sampler;
+
+        glm::vec4 value = interpolate(sampler.input, sampler.output,
+                                      fmod(animationTime, sampler.input.back()), channel.path);
+
+        auto& node = model.nodes[nodeIndex];
+        if (channel.path == "translation")
+        {
+            node.translation = { value.x, value.y, value.z };
+        }
+        else if (channel.path == "rotation")
+        {
+            node.rotation = { value.x, value.y, value.z, value.w };
+        }
+        else if (channel.path == "scale")
+        {
+            node.scale = { value.x, value.y, value.z };
+        }
+    }
+
+    // Recompute all local node matrices
+    nodeMatrices.clear();
+    for (const auto& node : model.nodes)
+        nodeMatrices.push_back(getNodeTransform(node)); // your existing helper
+
+    // Recompute world transforms
+    meshTransforms.clear();
+    const auto& defaultScene = model.scenes[model.defaultScene >= 0 ? model.defaultScene : 0];
+    for (int rootNodeIndex : defaultScene.nodes)
+        traverseScene(model, rootNodeIndex, nodeMatrices, glm::mat4(1.0f), meshTransforms);
+}
+
 int main()
 {
     glfwInit();
@@ -423,6 +539,62 @@ int main()
         }
     }
 
+    for (const auto& anim : model.animations)
+    {
+        Animation animOut;
+        animOut.name = anim.name;
+
+        for (const auto& channel : anim.channels)
+        {
+            const auto& sampler = anim.samplers[channel.sampler];
+            const auto& inputAccessor = model.accessors[sampler.input];
+            const auto& outputAccessor = model.accessors[sampler.output];
+
+            AnimChannel channelOut;
+            channelOut.targetNode = channel.target_node;
+            channelOut.path = channel.target_path;
+            channelOut.sampler.interpolation = sampler.interpolation;
+
+            // Read input times
+            {
+                const auto& inputView = model.bufferViews[inputAccessor.bufferView];
+                const auto& inputBuffer = model.buffers[inputView.buffer];
+
+                const float* input = reinterpret_cast<const float*>(
+                    inputBuffer.data.data() + inputView.byteOffset + inputAccessor.byteOffset);
+
+                channelOut.sampler.input = std::vector<float>(input, input + inputAccessor.count);
+            }
+
+            // Read outputs
+
+            const auto& outputView = model.bufferViews[outputAccessor.bufferView];
+            const auto& outputBuffer = model.buffers[outputView.buffer];
+
+            const uint8_t* outputData =
+                outputBuffer.data.data() + outputView.byteOffset + outputAccessor.byteOffset;
+
+            if (channel.target_path == "rotation")
+            {
+                const glm::vec4* output = reinterpret_cast<const glm::vec4*>(
+                    outputBuffer.data.data() + outputView.byteOffset + outputAccessor.byteOffset);
+                channelOut.sampler.output =
+                    std::vector<glm::vec4>(output, output + outputAccessor.count);
+            }
+            else
+            {
+                const glm::vec3* output = reinterpret_cast<const glm::vec3*>(
+                    outputBuffer.data.data() + outputView.byteOffset + outputAccessor.byteOffset);
+                for (size_t i = 0; i < outputAccessor.count; ++i)
+                    channelOut.sampler.output.push_back(glm::vec4(output[i], 0.0f)); // pad to vec4
+            }
+
+            animOut.channels.push_back(channelOut);
+        }
+
+        animations.push_back(animOut);
+    }
+
     float deltaTime = 0.f;
     float lastFrame = 0.f;
 
@@ -468,6 +640,15 @@ int main()
                             camera.getYaw());
         player.update(deltaTime, 0);
         grassManager.update(deltaTime, glm::vec3(1.f, 0.f, 0.5f));
+
+        std::vector<glm::mat4> nodeMatrices;
+        nodeMatrices.clear();
+        for (const auto& node : model.nodes)
+        {
+            nodeMatrices.push_back(getNodeTransform(node));
+        }
+
+        updateAnimation(deltaTime, model, nodeMatrices, meshTransforms);
 
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
