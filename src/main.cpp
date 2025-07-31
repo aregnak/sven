@@ -594,6 +594,9 @@ int main()
 
         animations.push_back(animOut);
     }
+    std::cout << "Animations loaded: " << animations.size() << "\n";
+    for (auto& a : animations)
+        std::cout << " - " << a.name << " channel count: " << a.channels.size() << "\n";
 
     float deltaTime = 0.f;
     float lastFrame = 0.f;
