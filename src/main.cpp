@@ -111,13 +111,6 @@ int main()
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
-    // Camera UBO for compute shader
-    GLuint camera_ubo;
-    glGenBuffers(1, &camera_ubo);
-    glBindBuffer(GL_UNIFORM_BUFFER, camera_ubo);
-    glBufferData(GL_UNIFORM_BUFFER, sizeof(CameraBufferObject), nullptr, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, camera_ubo); // Bind to binding = 0
-
     GrassManager grassManager;
     grassManager.initialize(160000, 60.f, 60.f);
 
@@ -138,12 +131,6 @@ int main()
         ImGui::Text("Delta Time: %.3f", deltaTime);
         ImGui::End();
 
-        bool moveForward = glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS;
-        bool moveBackward = glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS;
-        bool moveLeft = glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS;
-        bool moveRight = glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS;
-        bool jump = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
-
         grassManager.update(deltaTime, glm::vec3(1.f, 0.f, 0.5f));
 
         // Background color
@@ -159,15 +146,6 @@ int main()
         glm::mat4 view = camera.getViewMatrix();
         glm::mat4 projection =
             glm::perspective(glm::radians(60.0f), (float)SCR_WIDTH / SCR_HEIGHT, 0.1f, 100.0f);
-
-        // Update camera UBO for compute shader
-        CameraBufferObject camubo;
-        camubo.view = view;
-        camubo.proj = projection;
-        camubo.position = camera.getPosition();
-        glBindBuffer(GL_UNIFORM_BUFFER, camera_ubo);
-        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(CameraBufferObject), &camubo);
-
         grassManager.render(view, projection, camera.getPosition());
 
         shader.setMat4("view", view);
