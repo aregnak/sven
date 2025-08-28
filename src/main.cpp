@@ -4,12 +4,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
-#include <map>
-#include <algorithm>
-#include <vector>
 #include <cstdlib>
 #include <ctime>
-#include "shader.h"
 
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_glfw.h"
@@ -17,7 +13,7 @@
 
 #include "camera.h"
 #include "grass.h"
-#include "player.h"
+#include "shader.h"
 
 // Global variables
 const int SCR_WIDTH = 1280;
@@ -67,7 +63,6 @@ struct CameraBufferObject
     glm::mat4 view;
     glm::mat4 proj;
     glm::vec3 position;
-    float _pad = 0.0f; // Padding to align to 16 bytes
 };
 
 int main()
@@ -79,13 +74,15 @@ int main()
     // MSAAx4
     glfwWindowHint(GLFW_SAMPLES, 4);
 
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "sven", NULL, NULL);
+    GLFWwindow* window =
+        glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "OpenGL Grass Rendering", NULL, NULL);
     if (!window)
     {
         std::cerr << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
         return -1;
     }
+
     glfwMakeContextCurrent(window);
     // VSYNC
     glfwSwapInterval(0);
@@ -130,6 +127,8 @@ int main()
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
+        glfwPollEvents();
+
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
@@ -139,8 +138,6 @@ int main()
         ImGui::Text("Delta Time: %.3f", deltaTime);
         ImGui::End();
 
-        glfwPollEvents();
-
         bool moveForward = glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS;
         bool moveBackward = glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS;
         bool moveLeft = glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS;
@@ -149,9 +146,7 @@ int main()
 
         grassManager.update(deltaTime, glm::vec3(1.f, 0.f, 0.5f));
 
-        std::vector<glm::mat4> nodeMatrices;
-        nodeMatrices.clear();
-
+        // Background color
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -173,6 +168,8 @@ int main()
         glBindBuffer(GL_UNIFORM_BUFFER, camera_ubo);
         glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(CameraBufferObject), &camubo);
 
+        grassManager.render(view, projection, camera.getPosition());
+
         shader.setMat4("view", view);
         shader.setMat4("projection", projection);
 
@@ -181,7 +178,6 @@ int main()
 
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
-        float aspectRatio = static_cast<float>(width) / height;
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

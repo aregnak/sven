@@ -109,26 +109,12 @@ void GrassManager::update(float deltaTime, const glm::vec3& windDirection)
 }
 
 void GrassManager::render(const glm::mat4& view, const glm::mat4& projection,
-                          const glm::vec3& viewPos,
-                          const std::array<Camera::FrustumPlane, 6>& frustumPlanes)
+                          const glm::vec3& viewPos)
+//   const std::array<Camera::FrustumPlane, 6>& frustumPlanes)
 {
-    // Only update if view has changed
-    static glm::mat4 lastView;
-    static glm::vec3 lastPos;
-    glm::vec3 currentPos = glm::vec3(view[3]);
-
-    // Check position change magnitude (more reliable than matrix comparison)
-    if (glm::length(currentPos - lastPos) > 0.1f)
-    {
-        CullGrassBlades(frustumPlanes);
-        lastView = view;
-        lastPos = currentPos;
-
-        // Only upload when culling changes
-        glBindBuffer(GL_ARRAY_BUFFER, m_instanceVBO);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, visibleBlades.size() * sizeof(GrassBlade),
-                        visibleBlades.data());
-    }
+    glBindBuffer(GL_ARRAY_BUFFER, m_instanceVBO);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, m_grassBlades.size() * sizeof(GrassBlade),
+                    m_grassBlades.data());
 
     // Render instances
     m_grassShader.use();
@@ -140,5 +126,5 @@ void GrassManager::render(const glm::mat4& view, const glm::mat4& projection,
     m_grassShader.setFloat("windStrength", m_windStrength);
 
     glBindVertexArray(m_VAO);
-    glDrawArraysInstanced(GL_TRIANGLES, 0, 3, visibleBlades.size());
+    glDrawArraysInstanced(GL_TRIANGLES, 0, 3, m_grassBlades.size());
 }
