@@ -13,14 +13,13 @@
 
 #include "camera.h"
 #include "grass.h"
-#include "shader.h"
 
 // Global variables
 const int SCR_WIDTH = 1280;
 const int SCR_HEIGHT = 720;
 
 // Camera variables
-Camera camera(glm::vec3(0.0f, 15.0f, 15.0f));
+Camera camera(glm::vec3(0.0f, 1.0f, 1.0f));
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
@@ -52,9 +51,20 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
     camera.processMouseMovement(xoffset, yoffset);
 }
 
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+void processInput(GLFWwindow* window, float deltaTime)
 {
-    camera.processMouseScroll(static_cast<float>(yoffset));
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        camera.processKeyboard(Camera::Movement::FORWARD, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        camera.processKeyboard(Camera::Movement::BACKWARD, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        camera.processKeyboard(Camera::Movement::LEFT, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        camera.processKeyboard(Camera::Movement::RIGHT, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+        camera.processKeyboard(Camera::Movement::DOWN, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+        camera.processKeyboard(Camera::Movement::UP, deltaTime);
 }
 
 // Add this struct at the top, after includes
@@ -101,8 +111,6 @@ int main()
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
 
-    Shader shader("shaders/vertex.glsl", "shaders/fragment.glsl");
-
     float deltaTime = 0.f;
     float lastFrame = 0.f;
 
@@ -132,27 +140,16 @@ int main()
         ImGui::End();
 
         grassManager.update(deltaTime, glm::vec3(1.f, 0.f, 0.5f));
+        processInput(window, deltaTime);
 
         // Background color
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        shader.use();
-
-        // Bind texture
-        glActiveTexture(GL_TEXTURE0);
-        shader.setInt("texture1", 0);
-
         glm::mat4 view = camera.getViewMatrix();
         glm::mat4 projection =
             glm::perspective(glm::radians(60.0f), (float)SCR_WIDTH / SCR_HEIGHT, 0.1f, 100.0f);
         grassManager.render(view, projection, camera.getPosition());
-
-        shader.setMat4("view", view);
-        shader.setMat4("projection", projection);
-
-        // Draw all loaded meshes
-        shader.setInt("texture1", 0);
 
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);

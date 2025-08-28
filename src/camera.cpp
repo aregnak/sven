@@ -36,20 +36,27 @@ void Camera::processMouseMovement(float xoffset, float yoffset)
     updateCameraVectors();
 }
 
-void Camera::processMouseScroll(float yoffset)
-{
-    distance -= yoffset * zoomSensitivity;
-    if (distance < minDistance)
-        distance = minDistance;
-    if (distance > maxDistance)
-        distance = maxDistance;
-    updateCameraVectors();
-}
-
 void Camera::updatePosition(glm::vec3 newTarget)
 {
     target = newTarget;
     updateCameraVectors();
+}
+
+void Camera::processKeyboard(Camera::Movement direction, float deltaTime)
+{
+    float velocity = movementSpeed * deltaTime;
+    if (direction == Camera::Movement::FORWARD)
+        position += front * velocity;
+    if (direction == Camera::Movement::BACKWARD)
+        position -= front * velocity;
+    if (direction == Camera::Movement::LEFT)
+        position -= right * velocity;
+    if (direction == Camera::Movement::RIGHT)
+        position += right * velocity;
+    if (direction == Camera::Movement::UP)
+        position += worldUp * velocity;
+    if (direction == Camera::Movement::DOWN)
+        position -= worldUp * velocity;
 }
 
 void Camera::updateCameraVectors()
@@ -64,73 +71,6 @@ void Camera::updateCameraVectors()
     front = glm::normalize(target - position);
     right = glm::normalize(glm::cross(front, worldUp));
     up = glm::normalize(glm::cross(right, front));
-
-    // // Calculate horizontal and vertical offsets
-    // float horizontalDistance = distance * cos(glm::radians(pitch));
-    // float verticalOffset = distance * sin(glm::radians(pitch));
-
-    // // Calculate new position
-    // position.x = target.x - horizontalDistance * cos(glm::radians(yaw));
-    // position.y = target.y + height + verticalOffset;
-    // position.z = target.z - horizontalDistance * sin(glm::radians(yaw));
-
-    // // Recalculate front vector (points toward target)
-    // front = glm::normalize(target - position);
-    // right = glm::normalize(glm::cross(front, worldUp));
-    // up = glm::normalize(glm::cross(right, front));
-}
-
-std::array<Camera::FrustumPlane, 6> Camera::getFrustumPlanes(float aspectRatio) const
-{
-    std::array<FrustumPlane, 6> planes;
-    const glm::mat4 vp = getProjectionMatrix(aspectRatio) * getViewMatrix();
-
-    // Each plane: Ax + By + Cz + D = 0, extracted from rows of the matrix
-
-    // Left
-    planes[0].normal.x = vp[0][3] + vp[0][0];
-    planes[0].normal.y = vp[1][3] + vp[1][0];
-    planes[0].normal.z = vp[2][3] + vp[2][0];
-    planes[0].distance = vp[3][3] + vp[3][0];
-
-    // Right
-    planes[1].normal.x = vp[0][3] - vp[0][0];
-    planes[1].normal.y = vp[1][3] - vp[1][0];
-    planes[1].normal.z = vp[2][3] - vp[2][0];
-    planes[1].distance = vp[3][3] - vp[3][0];
-
-    // Bottom
-    planes[2].normal.x = vp[0][3] + vp[0][1];
-    planes[2].normal.y = vp[1][3] + vp[1][1];
-    planes[2].normal.z = vp[2][3] + vp[2][1];
-    planes[2].distance = vp[3][3] + vp[3][1];
-
-    // Top
-    planes[3].normal.x = vp[0][3] - vp[0][1];
-    planes[3].normal.y = vp[1][3] - vp[1][1];
-    planes[3].normal.z = vp[2][3] - vp[2][1];
-    planes[3].distance = vp[3][3] - vp[3][1];
-
-    // Near
-    planes[4].normal.x = vp[0][3] + vp[0][2];
-    planes[4].normal.y = vp[1][3] + vp[1][2];
-    planes[4].normal.z = vp[2][3] + vp[2][2];
-    planes[4].distance = vp[3][3] + vp[3][2];
-
-    // Far
-    planes[5].normal.x = vp[0][3] - vp[0][2];
-    planes[5].normal.y = vp[1][3] - vp[1][2];
-    planes[5].normal.z = vp[2][3] - vp[2][2];
-    planes[5].distance = vp[3][3] - vp[3][2];
-    // Normalize all planes
-    for (auto& plane : planes)
-    {
-        float length = glm::length(plane.normal);
-        plane.normal /= length;
-        plane.distance /= length;
-    }
-
-    return planes;
 }
 
 glm::mat4 Camera::getViewMatrix() const { return glm::lookAt(position, target, up); }

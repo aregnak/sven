@@ -18,19 +18,20 @@ public:
 
     enum class Movement
     {
-        FOREWARD,
+        FORWARD,
         BACKWARD,
         LEFT,
-        RIGHT
+        RIGHT,
+        UP,
+        DOWN
     };
 
     Camera(glm::vec3 target = glm::vec3(0.0f), float distance = 10.f, float height = 2.f);
 
     void processMouseMovement(float xoffset, float yoffset);
-    void processMouseScroll(float yoffset);
+    void processKeyboard(Camera::Movement direction, float deltaTime);
     void updatePosition(glm::vec3 newTarget);
 
-    std::array<FrustumPlane, 6> getFrustumPlanes(float aspectRatio) const;
     glm::mat4 getViewMatrix() const;
     glm::mat4 getProjectionMatrix(float aspectRatio, float near = 0.1f, float far = 100.0f) const;
     glm::vec3 getPosition() const;
