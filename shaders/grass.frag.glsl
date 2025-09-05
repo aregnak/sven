@@ -24,9 +24,6 @@ void main() {
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = diff * lightColor;
     
-    // Specular (not really needed for grass)
-    float specularStrength = 0.0;
-    
     vec3 result = (ambient + diffuse) * Color;
     FragColor = vec4(result, 1.0);
     

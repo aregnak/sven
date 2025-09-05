@@ -25,9 +25,8 @@ void Camera::processMouseMovement(float xoffset, float yoffset)
     yoffset *= mouseSensitivity;
 
     yaw += xoffset;
-    pitch += yoffset;
+    pitch -= yoffset;
 
-    // Constrain pitch to prevent flipping
     if (pitch > 89.0f)
         pitch = 89.0f;
     if (pitch < -89.0f)
@@ -54,26 +53,25 @@ void Camera::processKeyboard(Camera::Movement direction, float deltaTime)
     if (direction == Camera::Movement::RIGHT)
         position += right * velocity;
     if (direction == Camera::Movement::UP)
-        position += worldUp * velocity;
+        position += up * velocity;
     if (direction == Camera::Movement::DOWN)
-        position -= worldUp * velocity;
+        position -= up * velocity;
 }
 
 void Camera::updateCameraVectors()
 {
-    float horizontalDistance = distance * cos(glm::radians(pitch));
-    float verticalOffset = distance * sin(glm::radians(pitch));
+    glm::vec3 newFront;
+    newFront.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+    newFront.y = sin(glm::radians(pitch));
+    newFront.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+    front = glm::normalize(newFront);
 
-    position.x = target.x - horizontalDistance * cos(glm::radians(yaw));
-    position.y = target.y + height + verticalOffset;
-    position.z = target.z - horizontalDistance * sin(glm::radians(yaw));
-
-    front = glm::normalize(target - position);
+    // Also re-calculate the right and up vectors
     right = glm::normalize(glm::cross(front, worldUp));
     up = glm::normalize(glm::cross(right, front));
 }
 
-glm::mat4 Camera::getViewMatrix() const { return glm::lookAt(position, target, up); }
+glm::mat4 Camera::getViewMatrix() const { return glm::lookAt(position, position + front, up); }
 
 glm::mat4 Camera::getProjectionMatrix(float aspectRatio, float near, float far) const
 {
